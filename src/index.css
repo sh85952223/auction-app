@@ -244,3 +244,14 @@ body {
 .bidding-area {
   background-image: linear-gradient(135deg, rgba(26,10,2,0.9), rgba(74,37,17,0.9));
 }
+
+.mask-hover {
+  filter: blur(6px);
+  transition: filter 0.2s;
+  user-select: none;
+}
+
+.mask-hover:hover {
+  filter: blur(0);
+  user-select: auto;
+}

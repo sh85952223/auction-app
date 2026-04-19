@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import AuctionBoard from './AuctionBoard';
 import { Gavel, Play, Eye, Check, FileText, X, Settings, UserX, UserPlus, Trash2, RefreshCw } from 'lucide-react';
 
-export default function TeacherView({ gameState, socket, teamBidStatus, connectedTeams, onLogout }) {
+export default function TeacherView({ gameState, socket, teamBidStatus, connectedTeams, initialBids, onLogout }) {
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showTeamMgmt, setShowTeamMgmt] = useState(false);
+  const [isProjectorMode, setIsProjectorMode] = useState(false);
 
   const handleStartAuction = () => {
     if (selectedItemId) {
@@ -36,6 +37,25 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
         <div>
           <h2 className="gold-text m-0 flex items-center gap-2" style={{ marginTop: 0 }}>
             <Gavel size={28} /> 재판장 대시보드 {gameState.classInfo && <span style={{fontSize:'1.2rem', color:'#f4ecd8'}}>[{gameState.classInfo.grade}학년 {gameState.classInfo.classNum}반]</span>}
+            <button 
+              onClick={() => setIsProjectorMode(!isProjectorMode)}
+              style={{ 
+                marginLeft: '1rem', 
+                fontSize: '0.8rem', 
+                padding: '0.3rem 0.6rem', 
+                borderRadius: '20px', 
+                border: '1px solid #d4af37',
+                backgroundColor: isProjectorMode ? '#d4af37' : 'transparent',
+                color: isProjectorMode ? '#1a1a1a' : '#d4af37',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                transition: 'all 0.2s'
+              }}
+            >
+              <Eye size={14} /> {isProjectorMode ? '프로젝터 모드: ON (보안)' : '프로젝터 모드: OFF'}
+            </button>
           </h2>
           <div style={{ fontSize: '1rem', color: '#ccc', marginTop: '0.5rem' }}>
             진행 상태: <strong style={{ color: '#fff' }}>
@@ -67,7 +87,7 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
                   onClick={() => socket.emit('approveSecretTickets')}
                   style={{ backgroundColor: '#2563eb', borderColor: '#60a5fa' }}
                 >
-                  <Eye size={20} /> 해제권 허가 및 재입찰 진행 (요청됨!)
+                  <Eye size={20} /> 해제권 허가 및 재입찰 진행 {isProjectorMode ? '(요청됨)' : `(${Object.values(gameState.secretTicketRequests).filter(v => v).length}팀 요청!)`}
                 </button>
               )}
               <button 
@@ -195,7 +215,8 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '0.8rem',
-                  borderRadius: '0 4px 4px 0'
+                  borderRadius: '0 4px 4px 0',
+                  position: 'relative'
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <div>
@@ -211,9 +232,21 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
                       {(gameState.auctionPhase === 'BIDDING' || gameState.auctionPhase === 'REBIDDING') && hasBid && (
                         <div style={{ color: teamBidStatus[team.id]?.isGuess ? '#34d399' : '#4ade80', fontWeight: 'bold', fontSize: '0.9rem' }}>
                            {teamBidStatus[team.id]?.isGuess ? '예측 완료' : '제출 완료'} 
-                           {gameState.secretTicketRequests?.[team.id] && <span style={{color: '#60a5fa'}}> (해제권 요청)</span>}
+                           {gameState.secretTicketRequests?.[team.id] && !isProjectorMode && <span style={{color: '#60a5fa'}}> (해제권 요청)</span>}
                         </div>
                       )}
+                      
+                      {gameState.auctionPhase === 'REBIDDING' && initialBids?.[team.id] !== undefined && (
+                         <div style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
+                            {isProjectorMode ? 
+                              <span title="교사 직접 확인용: 마우스를 올리면 보입니다" style={{ backgroundColor: '#222', padding: '0 0.5rem', borderRadius: '4px', cursor: 'help' }} className="mask-hover">
+                                 {initialBids[team.id]}
+                              </span> : 
+                              <span className="gold-text">{initialBids[team.id]} (1차)</span>
+                            }
+                         </div>
+                      )}
+
                       {gameState.auctionPhase === 'REVEALING' && gameState.bids[team.id] !== undefined && (
                         <div className="gold-text stamp-anim" style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>
                           {gameState.bids[team.id]}

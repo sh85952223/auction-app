@@ -146,6 +146,7 @@ function App() {
           socket={socket} 
           teamBidStatus={teamBidStatus} 
           connectedTeams={connectedTeams} 
+          initialBids={initialBids}
           onLogout={handleLogout}
         />
       ) : (
