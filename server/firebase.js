@@ -36,9 +36,8 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
 async function saveGameState(state) {
   if (!db) return;
   try {
-    // Save to 'auction' collection, document 'currentState'
-    const { initialBids, ...safeState } = state; 
-    await db.collection('auction').doc('currentState').set(safeState);
+    // Save full state for recovery (sanitization happens on broadcast)
+    await db.collection('auction').doc('currentState').set(state);
   } catch (err) {
     console.error('Error saving state to Firebase:', err);
   }
@@ -57,8 +56,22 @@ async function logAuctionEvent(eventData) {
   }
 }
 
+async function loadGameState() {
+  if (!db) return null;
+  try {
+    const doc = await db.collection('auction').doc('currentState').get();
+    if (doc.exists) {
+      return doc.data();
+    }
+  } catch (err) {
+    console.error('Error loading state from Firebase:', err);
+  }
+  return null;
+}
+
 module.exports = {
   db,
   saveGameState,
+  loadGameState,
   logAuctionEvent
 };

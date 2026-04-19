@@ -1,6 +1,6 @@
 // State representing the auction
 const initialBudget = 1000;
-const { saveGameState } = require('./firebase');
+const { saveGameState, loadGameState } = require('./firebase');
 
 // items categorized
 const categories = {
@@ -165,6 +165,18 @@ function broadcastState(io) {
 }
 
 function setupSocketHandlers(io) {
+  // Load initial state from Firebase
+  (async () => {
+    const savedState = await loadGameState();
+    if (savedState) {
+       // Merge saved state, preserving transient fields like disconnected sockets if desired
+       // For simplicity, we replace the state but keep the basic structure
+       state = { ...state, ...savedState };
+       console.log('Auction state restored from Firebase.');
+       broadcastState(io); // Update any clients that connected early
+    }
+  })();
+
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
