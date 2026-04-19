@@ -21,7 +21,9 @@ setupSocketHandlers(io);
 
 // Serve static React build files in production
 app.use(express.static(path.join(__dirname, '../dist')));
-app.get('/*', (req, res) => {
+
+// Catch-all route for SPA - no pattern to avoid Express 5 path-to-regexp errors
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
 
