@@ -79,6 +79,7 @@ function createInitialState() {
       name: `${i+1}모둠`,
       budget: initialBudget,
       hasSecretTicket: true,
+      studentInfo: null,
       wonItems: {
           condition: null,
           atmosphere: null,
@@ -178,11 +179,17 @@ function setupSocketHandlers(io) {
         }
         
         // If a new class connects, reset the game state for the new class
-        if (classInfo && (!state.classInfo || String(state.classInfo.grade) !== String(classInfo.grade) || String(state.classInfo.classNum) !== String(classInfo.classNum))) {
+        const isNewClass = classInfo && state.classInfo && (
+          String(state.classInfo.grade) !== String(classInfo.grade) || 
+          String(state.classInfo.classNum) !== String(classInfo.classNum)
+        );
+
+        if (isNewClass) {
            const savedConnectedTeams = { ...state.connectedTeams };
            state = createInitialState();
            state.classInfo = classInfo;
            state.connectedTeams = savedConnectedTeams;
+           // If class changed, reset studentInfo for all currently connected sockets
            Object.values(savedConnectedTeams).forEach(tId => {
              const team = state.teams.find(t => t.id === tId);
              if (team) team.studentInfo = null;
