@@ -6,14 +6,21 @@ const cors = require('cors');
 const path = require('path');
 const { setupSocketHandlers } = require('./gameLogic');
 
+// 필수 환경변수 검증
+if (!process.env.TEACHER_PIN) {
+  console.error('FATAL: TEACHER_PIN 환경변수가 설정되지 않았습니다.');
+  console.error('  .env 파일에 TEACHER_PIN=<비밀번호> 를 추가하세요.');
+  process.exit(1);
+}
+
 const app = express();
 app.use(cors());
 
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*", // allow all in dev
-    methods: ["GET", "POST"]
+    origin: process.env.ALLOWED_ORIGIN || 'http://localhost:5173',
+    methods: ['GET', 'POST'],
   }
 });
 
@@ -22,7 +29,7 @@ setupSocketHandlers(io);
 // Serve static React build files in production
 app.use(express.static(path.join(__dirname, '../dist')));
 
-// Catch-all route for SPA - no pattern to avoid Express 5 path-to-regexp errors
+// Catch-all route for SPA
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, '../dist/index.html'));
 });

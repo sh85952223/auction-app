@@ -149,17 +149,27 @@ function sanitizeState() {
   return safeState;
 }
 
+let _saveTimer = null;
+function scheduleSave() {
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => saveGameState(state), 500);
+}
+
 function broadcastState(io) {
   io.emit('gameState', sanitizeState());
-  saveGameState(state);
+  scheduleSave();
 }
 
 function setupSocketHandlers(io) {
   (async () => {
     const savedState = await loadGameState();
     if (savedState) {
-       state = { ...state, ...savedState };
-       // Ensure categoryConfig is always present (backward compat with old Firebase data)
+       state = {
+         ...state,
+         ...savedState,
+         connectedTeams: {}, // 재시작 후 이전 socket ID는 유효하지 않으므로 초기화
+         teacherSocketId: null,
+       };
        if (!state.categoryConfig) {
          state.categoryConfig = defaultCategoryConfig;
        }
@@ -175,7 +185,7 @@ function setupSocketHandlers(io) {
 
     socket.on('joinAs', ({ role, teamId, studentInfo, classInfo, pin }) => {
       if (role === 'teacher') {
-        const correctPin = process.env.TEACHER_PIN || '1234';
+        const correctPin = process.env.TEACHER_PIN;
         if (pin !== correctPin) {
            socket.emit('authError', '비밀번호가 올바르지 않습니다.');
            return;
@@ -372,6 +382,7 @@ function setupSocketHandlers(io) {
     });
 
     socket.on('resolveTie', (winnerId) => {
+      if (socket.id !== state.teacherSocketId) return;
       if (state.auctionPhase !== 'TIE_BREAKER') return;
 
       const item = state.items.find(i => i.id === state.currentAuctionItemId);
@@ -544,14 +555,18 @@ function setupSocketHandlers(io) {
       }
       socket.emit('bidAccepted', { amount: validBid });
 
-      io.emit('bidsUpdated', Object.keys(state.bids));
-      io.emit('ticketRequestsUpdated', state.secretTicketRequests);
+      // 입찰 현황은 교사에게만 (학생에게 타 팀 입찰 여부 노출 방지)
+      if (state.teacherSocketId) {
+        io.to(state.teacherSocketId).emit('bidsUpdated', Object.keys(state.bids));
+        io.to(state.teacherSocketId).emit('ticketRequestsUpdated', state.secretTicketRequests);
+      }
     });
 
     socket.on('submitGuess', ({ amount }) => {
       const teamId = state.connectedTeams[socket.id];
       if (!teamId) return;
       if (state.auctionPhase !== 'BIDDING' && state.auctionPhase !== 'REBIDDING') return;
+      if (state.bids[teamId] !== undefined) return; // 이미 입찰한 팀은 예측 불가
 
       let validGuess = Math.max(0, parseInt(amount, 10) || 0);
       if (validGuess % 50 !== 0) {
@@ -570,7 +585,9 @@ function setupSocketHandlers(io) {
       }
 
       socket.emit('bidAccepted', { amount: 0, isGuess: true });
-      io.emit('bidsUpdated', [...new Set([...Object.keys(state.bids), ...Object.keys(state.guesses)])]);
+      if (state.teacherSocketId) {
+        io.to(state.teacherSocketId).emit('bidsUpdated', [...new Set([...Object.keys(state.bids), ...Object.keys(state.guesses)])]);
+      }
     });
   });
 }
