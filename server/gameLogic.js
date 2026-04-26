@@ -97,9 +97,15 @@ function createInitialState(categoryConfig = defaultCategoryConfig) {
 const rooms = new Map(); // roomId → state
 const _saveTimers = new Map(); // roomId → timer
 
-function makeRoomId(classInfo) {
-  if (!classInfo?.grade || !classInfo?.classNum) return null;
-  return `${classInfo.grade}-${classInfo.classNum}`;
+const SESSION_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function generateSessionCode() {
+  let code;
+  do {
+    code = Array.from({ length: 6 }, () =>
+      SESSION_CODE_CHARS[Math.floor(Math.random() * SESSION_CODE_CHARS.length)]
+    ).join('');
+  } while (rooms.has(code));
+  return code;
 }
 
 function getOrCreateRoom(roomId) {
@@ -213,25 +219,23 @@ function setupSocketHandlers(io) {
       return false;
     }
 
-    // 학생이 팀 목록 요청 시 해당 반의 팀 목록 반환
-    socket.on('getTeamsForClass', ({ grade, classNum }) => {
-      const roomId = makeRoomId({ grade, classNum });
-      const state = roomId ? rooms.get(roomId) : null;
+    // 학생이 세션 코드로 팀 목록 요청
+    socket.on('getTeamsForClass', ({ sessionCode }) => {
+      const state = sessionCode ? rooms.get(sessionCode) : null;
       socket.emit('teamsForClass', state ? state.teams : []);
     });
 
-    socket.on('joinAs', ({ role, teamId, studentInfo, classInfo, pin }) => {
+    socket.on('joinAs', ({ role, teamId, studentInfo, classInfo, pin, sessionCode }) => {
       if (role === 'teacher') {
         if (pin !== process.env.TEACHER_PIN) {
           socket.emit('authError', '비밀번호가 올바르지 않습니다.');
           return;
         }
 
-        const roomId = makeRoomId(classInfo);
-        if (!roomId) {
-          socket.emit('authError', '학년과 반 정보를 입력해주세요.');
-          return;
-        }
+        // 재접속: 기존 세션 코드로 룸 복원
+        let roomId = sessionCode && rooms.has(sessionCode) ? sessionCode : null;
+        // 신규: 새 세션 코드 생성
+        if (!roomId) roomId = generateSessionCode();
 
         const state = getOrCreateRoom(roomId);
         if (classInfo) state.classInfo = classInfo;
@@ -240,6 +244,7 @@ function setupSocketHandlers(io) {
         socket.join(roomId);
 
         console.log(`Teacher connected to room ${roomId}`);
+        socket.emit('sessionCode', roomId);
         socket.emit('gameState', sanitizeState(state, true));
         socket.emit('connectedTeams', Object.values(state.connectedTeams));
 
@@ -262,9 +267,9 @@ function setupSocketHandlers(io) {
         }
 
       } else if (role === 'team' && teamId) {
-        const roomId = makeRoomId(studentInfo ? { grade: studentInfo.grade, classNum: studentInfo.classNum } : null);
-        if (!roomId) {
-          socket.emit('authError', '학년과 반 정보가 필요합니다.');
+        const roomId = sessionCode || null;
+        if (!roomId || !rooms.has(roomId)) {
+          socket.emit('authError', '유효하지 않은 세션 코드입니다. 교사에게 세션 코드를 확인하세요.');
           return;
         }
 

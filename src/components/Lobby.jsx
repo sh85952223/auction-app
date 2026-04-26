@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Gavel, Users, ChevronLeft } from 'lucide-react';
 
-// step: 'ROLE' | 'TEACHER' | 'TEAM_CLASS' | 'TEAM_SELECT' | 'TEAM_INFO'
-export default function Lobby({ onJoin, onRequestTeams, connectedTeams, teams, lobbyTeams }) {
+// step: 'ROLE' | 'TEACHER' | 'SESSION_CODE' | 'TEAM_SELECT' | 'TEAM_INFO'
+export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTeams }) {
   const [step, setStep] = useState('ROLE');
   const [selectedTeam, setSelectedTeam] = useState(null);
 
@@ -11,11 +11,11 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, teams, l
   const [teacherGrade, setTeacherGrade] = useState('');
   const [teacherClassNum, setTeacherClassNum] = useState('');
 
-  // Student class selection state (TEAM_CLASS step)
-  const [studentGrade, setStudentGrade] = useState('');
-  const [studentClassNum, setStudentClassNum] = useState('');
+  // Student session code state
+  const [sessionCode, setSessionCode] = useState('');
+  const [sessionCodeError, setSessionCodeError] = useState('');
 
-  // Student info state (TEAM_INFO step) — pre-filled from TEAM_CLASS
+  // Student info state (TEAM_INFO step)
   const [grade, setGrade] = useState('');
   const [classNum, setClassNum] = useState('');
   const [members, setMembers] = useState(['', '', '', '']);
@@ -32,16 +32,14 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, teams, l
     onJoin('teacher', null, { grade: teacherGrade, classNum: teacherClassNum }, teacherPin);
   };
 
-  const handleClassSubmit = () => {
-    if (!studentGrade || !studentClassNum) {
-      alert('학년과 반을 입력하세요.');
+  const handleSessionCodeSubmit = () => {
+    const code = sessionCode.trim().toUpperCase();
+    if (code.length !== 6) {
+      setSessionCodeError('세션 코드는 6자리입니다.');
       return;
     }
-    // 해당 반의 팀 목록을 서버에 요청
-    onRequestTeams({ grade: studentGrade, classNum: studentClassNum });
-    // TEAM_INFO에서 재입력 불필요하도록 미리 채워둠
-    setGrade(studentGrade);
-    setClassNum(studentClassNum);
+    setSessionCodeError('');
+    onRequestTeams(code);
     setStep('TEAM_SELECT');
   };
 
@@ -62,11 +60,8 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, teams, l
       alert('학년, 반, 모둠원 이름을 최소 1명 이상 입력해주세요.');
       return;
     }
-    onJoin('team', selectedTeam.id, { grade, classNum, members: validMembers });
+    onJoin('team', selectedTeam.id, { grade, classNum, members: validMembers }, null, sessionCode.trim().toUpperCase());
   };
-
-  // TEAM_SELECT에 표시할 팀 목록: 서버에서 받은 반별 팀 목록 우선, 없으면 전역 teams 사용
-  const displayTeams = lobbyTeams && lobbyTeams.length > 0 ? lobbyTeams : teams;
 
   return (
     <div className="flex flex-col items-center justify-center" style={{ minHeight: '80vh', padding: '1.5rem' }}>
@@ -92,7 +87,7 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, teams, l
               </button>
               <button
                 className="btn-primary"
-                onClick={() => setStep('TEAM_CLASS')}
+                onClick={() => setStep('SESSION_CODE')}
                 style={{ padding: '1.2rem', fontSize: '1.3rem', width: '100%', backgroundColor: '#1e3a5f', borderColor: '#60a5fa', color: '#f4ecd8' }}
               >
                 <Users size={22} /> 학생 (모둠)으로 입장
@@ -149,8 +144,8 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, teams, l
           </div>
         )}
 
-        {/* ── STEP 1b: 학생 — 학년/반 선택 ── */}
-        {step === 'TEAM_CLASS' && (
+        {/* ── STEP 1b: 학생 — 세션 코드 입력 ── */}
+        {step === 'SESSION_CODE' && (
           <div style={{ marginTop: '1.5rem', textAlign: 'left' }}>
             <button
               onClick={() => setStep('ROLE')}
@@ -158,39 +153,30 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, teams, l
             >
               <ChevronLeft size={16} /> 역할 선택으로
             </button>
-            <h3 className="gold-text" style={{ margin: '0 0 1.5rem 0', textAlign: 'center' }}>
-              우리 반 선택
+            <h3 className="gold-text" style={{ margin: '0 0 1rem 0', textAlign: 'center' }}>
+              세션 코드 입력
             </h3>
-            <p style={{ color: '#aaa', fontSize: '0.9rem', marginBottom: '1.2rem', textAlign: 'center' }}>
-              경매에 참여 중인 학년과 반을 입력하세요
+            <p style={{ color: '#aaa', fontSize: '0.9rem', marginBottom: '1.5rem', textAlign: 'center' }}>
+              교사(재판장) 화면에 표시된 6자리 코드를 입력하세요
             </p>
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-              <input
-                type="number"
-                className="input-field"
-                placeholder="학년"
-                value={studentGrade}
-                onChange={(e) => setStudentGrade(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleClassSubmit()}
-                style={{ textAlign: 'center', flex: 1 }}
-                min="1" max="6"
-                autoFocus
-              />
-              <input
-                type="number"
-                className="input-field"
-                placeholder="반"
-                value={studentClassNum}
-                onChange={(e) => setStudentClassNum(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleClassSubmit()}
-                style={{ textAlign: 'center', flex: 1 }}
-                min="1" max="20"
-              />
-            </div>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="예: AB3X7K"
+              value={sessionCode}
+              onChange={(e) => { setSessionCode(e.target.value.toUpperCase()); setSessionCodeError(''); }}
+              onKeyDown={(e) => e.key === 'Enter' && handleSessionCodeSubmit()}
+              style={{ textAlign: 'center', fontSize: '1.8rem', letterSpacing: '0.3em', fontWeight: 'bold', marginBottom: '0.5rem' }}
+              maxLength={6}
+              autoFocus
+            />
+            {sessionCodeError && (
+              <p style={{ color: '#ef4444', fontSize: '0.9rem', textAlign: 'center', marginBottom: '0.5rem' }}>{sessionCodeError}</p>
+            )}
             <button
               className="btn-primary"
-              onClick={handleClassSubmit}
-              style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', backgroundColor: '#1e3a5f', borderColor: '#60a5fa', color: '#f4ecd8' }}
+              onClick={handleSessionCodeSubmit}
+              style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', marginTop: '0.5rem', backgroundColor: '#1e3a5f', borderColor: '#60a5fa', color: '#f4ecd8' }}
             >
               모둠 목록 불러오기
             </button>
@@ -201,24 +187,24 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, teams, l
         {step === 'TEAM_SELECT' && (
           <div style={{ marginTop: '1.5rem' }}>
             <button
-              onClick={() => setStep('TEAM_CLASS')}
+              onClick={() => setStep('SESSION_CODE')}
               style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.95rem' }}
             >
-              <ChevronLeft size={16} /> 반 선택으로
+              <ChevronLeft size={16} /> 코드 입력으로
             </button>
             <h3 className="gold-text" style={{ margin: '0 0 0.5rem 0' }}>
-              {studentGrade}학년 {studentClassNum}반 — 우리 모둠을 선택하세요
+              우리 모둠을 선택하세요
             </h3>
             <p style={{ color: '#aaa', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
               ※ 모둠별로 대표 기기 1대만 접속해야 합니다
             </p>
-            {displayTeams.length === 0 ? (
+            {lobbyTeams.length === 0 ? (
               <p style={{ color: '#888', padding: '2rem' }}>
-                교사가 아직 경매를 시작하지 않았거나 해당 반이 없습니다. 잠시 대기해 주세요.
+                교사가 아직 경매를 시작하지 않았거나 세션 코드가 올바르지 않습니다. 잠시 대기해 주세요.
               </p>
             ) : (
               <div className="items-grid">
-                {displayTeams.map((team) => {
+                {lobbyTeams.map((team) => {
                   const isConnected = connectedTeams && connectedTeams.includes(team.id);
                   return (
                     <button

@@ -10,7 +10,7 @@ function getCatColor(index) {
   return CAT_COLORS[index % CAT_COLORS.length];
 }
 
-export default function TeacherView({ gameState, socket, teamBidStatus, connectedTeams, initialBids, onLogout }) {
+export default function TeacherView({ gameState, socket, teamBidStatus, connectedTeams, initialBids, sessionCode, onLogout }) {
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showTeamMgmt, setShowTeamMgmt] = useState(false);
@@ -148,11 +148,20 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
       {/* Header */}
       <div className="panel flex justify-between items-center" style={{ position: 'sticky', top: '1rem', zIndex: 50, backgroundColor: 'rgba(74, 37, 17, 0.95)', backdropFilter: 'blur(10px)', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2 className="gold-text m-0 flex items-center gap-2" style={{ marginTop: 0 }}>
+          <h2 className="gold-text m-0 flex items-center gap-2" style={{ marginTop: 0, flexWrap: 'wrap' }}>
             <Gavel size={28} /> 재판장 대시보드 {gameState.classInfo && <span style={{fontSize:'1.2rem', color:'#f4ecd8'}}>[{gameState.classInfo.grade}학년 {gameState.classInfo.classNum}반]</span>}
+            {sessionCode && (
+              <span
+                onClick={() => { navigator.clipboard?.writeText(sessionCode); }}
+                title="클릭하여 복사"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', marginLeft: '0.5rem', padding: '0.25rem 0.8rem', borderRadius: '8px', border: '2px solid #60a5fa', backgroundColor: 'rgba(30,58,95,0.8)', color: '#60a5fa', fontSize: '1.3rem', fontWeight: 'bold', letterSpacing: '0.18em', cursor: 'pointer', userSelect: 'all' }}
+              >
+                {sessionCode}
+              </span>
+            )}
             <button
               onClick={() => setIsProjectorMode(!isProjectorMode)}
-              style={{ marginLeft: '1rem', fontSize: '0.8rem', padding: '0.3rem 0.6rem', borderRadius: '20px', border: '1px solid #d4af37', backgroundColor: isProjectorMode ? '#d4af37' : 'transparent', color: isProjectorMode ? '#1a1a1a' : '#d4af37', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', transition: 'all 0.2s' }}
+              style={{ marginLeft: '0.5rem', fontSize: '0.8rem', padding: '0.3rem 0.6rem', borderRadius: '20px', border: '1px solid #d4af37', backgroundColor: isProjectorMode ? '#d4af37' : 'transparent', color: isProjectorMode ? '#1a1a1a' : '#d4af37', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', transition: 'all 0.2s' }}
             >
               <Eye size={14} /> {isProjectorMode ? '프로젝터 모드: ON (보안)' : '프로젝터 모드: OFF'}
             </button>

@@ -12,33 +12,42 @@ function App() {
   const [initialBids, setInitialBids] = useState(null);
   const [role, setRole] = useState(null); // 'teacher' or 'team'
   const [teamId, setTeamId] = useState(null);
+  const [sessionCode, setSessionCode] = useState(null);
   const [bidLimits, setBidLimits] = useState({ maxBid: 0 });
   const [teamBidStatus, setTeamBidStatus] = useState({});
   const [connectedTeams, setConnectedTeams] = useState([]);
   const [lobbyTeams, setLobbyTeams] = useState([]);
 
-  const handleRequestTeams = (classInfo) => {
-    socket.emit('getTeamsForClass', classInfo);
+  const handleRequestTeams = (code) => {
+    socket.emit('getTeamsForClass', { sessionCode: code });
   };
 
-  const handleJoin = (selectedRole, selectedTeamId = null, extraInfo = null, pin = null) => {
+  const handleJoin = (selectedRole, selectedTeamId = null, extraInfo = null, pin = null, code = null) => {
     if (selectedRole === 'teacher') {
       localStorage.setItem('auctionRole', 'teacher');
       if (pin) localStorage.setItem('auctionPin', pin);
       if (extraInfo) localStorage.setItem('auctionClassInfo', JSON.stringify(extraInfo));
+      // sessionCode는 서버가 발급 → sessionCode 이벤트로 저장
     } else if (selectedRole === 'team') {
       localStorage.setItem('auctionRole', 'team');
       localStorage.setItem('auctionTeamId', selectedTeamId);
-      if (extraInfo) {
-        localStorage.setItem('auctionStudentInfo', JSON.stringify(extraInfo));
-      }
+      if (extraInfo) localStorage.setItem('auctionStudentInfo', JSON.stringify(extraInfo));
+      if (code) localStorage.setItem('auctionSessionCode', code);
     }
 
     setRole(selectedRole);
     if (selectedRole === 'team') {
       setTeamId(selectedTeamId);
+      setSessionCode(code);
     }
-    socket.emit('joinAs', { role: selectedRole, teamId: selectedTeamId, classInfo: selectedRole === 'teacher' ? extraInfo : null, studentInfo: selectedRole === 'team' ? extraInfo : null, pin });
+    socket.emit('joinAs', {
+      role: selectedRole,
+      teamId: selectedTeamId,
+      classInfo: selectedRole === 'teacher' ? extraInfo : null,
+      studentInfo: selectedRole === 'team' ? extraInfo : null,
+      pin,
+      sessionCode: code,
+    });
   };
 
   const handleLogout = () => {
@@ -47,8 +56,10 @@ function App() {
     localStorage.removeItem('auctionStudentInfo');
     localStorage.removeItem('auctionPin');
     localStorage.removeItem('auctionClassInfo');
+    localStorage.removeItem('auctionSessionCode');
     setRole(null);
     setTeamId(null);
+    setSessionCode(null);
     window.location.reload();
   };
 
@@ -59,15 +70,17 @@ function App() {
       if (savedRole === 'teacher') {
         const savedPin = localStorage.getItem('auctionPin');
         const savedClassInfo = localStorage.getItem('auctionClassInfo');
+        const savedCode = localStorage.getItem('auctionSessionCode');
         let classInfo = null;
         try { if (savedClassInfo) classInfo = JSON.parse(savedClassInfo); } catch { /* invalid JSON, skip */ }
-        if (savedPin) handleJoin('teacher', null, classInfo, savedPin);
+        if (savedPin) handleJoin('teacher', null, classInfo, savedPin, savedCode);
       } else if (savedRole === 'team') {
         const savedTeamId = localStorage.getItem('auctionTeamId');
         const savedStudentInfo = localStorage.getItem('auctionStudentInfo');
-        if (savedTeamId && savedStudentInfo) {
+        const savedCode = localStorage.getItem('auctionSessionCode');
+        if (savedTeamId && savedStudentInfo && savedCode) {
           try {
-            handleJoin('team', savedTeamId, JSON.parse(savedStudentInfo));
+            handleJoin('team', savedTeamId, JSON.parse(savedStudentInfo), null, savedCode);
           } catch (e) {
             console.error('Failed to parse student info', e);
           }
@@ -124,6 +137,11 @@ function App() {
       setLobbyTeams(teams);
     });
 
+    socket.on('sessionCode', (code) => {
+      setSessionCode(code);
+      localStorage.setItem('auctionSessionCode', code);
+    });
+
     socket.on('authError', (msg) => {
       alert(msg);
       handleLogout();
@@ -139,12 +157,13 @@ function App() {
       socket.off('ticketRequestsUpdated');
       socket.off('initialBids');
       socket.off('teamsForClass');
+      socket.off('sessionCode');
       socket.off('authError');
     };
   }, []); // socket listeners are set up once on mount
 
   if (!role) {
-    return <Lobby onJoin={handleJoin} connectedTeams={connectedTeams} teams={gameState?.teams || []} onRequestTeams={handleRequestTeams} lobbyTeams={lobbyTeams} />;
+    return <Lobby onJoin={handleJoin} connectedTeams={connectedTeams} onRequestTeams={handleRequestTeams} lobbyTeams={lobbyTeams} />;
   }
 
   if (!gameState) {
@@ -160,6 +179,7 @@ function App() {
           teamBidStatus={teamBidStatus}
           connectedTeams={connectedTeams}
           initialBids={initialBids}
+          sessionCode={sessionCode}
           onLogout={handleLogout}
         />
       ) : (
