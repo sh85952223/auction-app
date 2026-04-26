@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import AuctionBoard from './AuctionBoard';
-import { Gavel, Play, Eye, Check, FileText, X, Settings, UserPlus, Trash2, RefreshCw, BookOpen, PlusCircle } from 'lucide-react';
+import { Gavel, Play, Eye, Check, FileText, X, Settings, UserPlus, Trash2, RefreshCw, BookOpen, PlusCircle, MoreVertical } from 'lucide-react';
 
 // Category colors for consistent styling
 const CAT_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#a855f7', '#ef4444', '#06b6d4'];
@@ -16,6 +16,18 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
   const [showCategoryConfig, setShowCategoryConfig] = useState(false);
   const [editingConfig, setEditingConfig] = useState(null);
   const [isProjectorMode, setIsProjectorMode] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const categoryConfig = gameState.categoryConfig || [];
 
@@ -126,9 +138,10 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
           </div>
         </div>
 
-        <div className="flex gap-4" style={{ flexWrap: 'wrap', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+        {/* ── 진행 액션 버튼 (경매 흐름 전용) ── */}
+        <div className="flex gap-4" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
           {gameState.auctionPhase === 'WAITING' && (
-            <button className="btn-primary" disabled={!selectedItemId} onClick={handleStartAuction}>
+            <button className="btn-primary" disabled={!selectedItemId} onClick={handleStartAuction} style={{ fontSize: '1.15rem', padding: '0.8rem 1.5rem' }}>
               <Play size={20} /> 경매 시작
             </button>
           )}
@@ -136,61 +149,86 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
             <>
               {Object.values(gameState.secretTicketRequests || {}).some(r => r) && (
                 <button className="btn-primary" onClick={() => socket.emit('approveSecretTickets')} style={{ backgroundColor: '#2563eb', borderColor: '#60a5fa' }}>
-                  <Eye size={20} /> 해제권 허가 및 재입찰 진행 {isProjectorMode ? '(요청됨)' : `(${Object.values(gameState.secretTicketRequests).filter(v => v).length}팀 요청!)`}
+                  <Eye size={20} /> 해제권 허가 및 재입찰 {isProjectorMode ? '(요청됨)' : `(${Object.values(gameState.secretTicketRequests).filter(v => v).length}팀)`}
                 </button>
               )}
-              <button className="btn-primary" onClick={handleReveal}>
+              <button className="btn-primary" onClick={handleReveal} style={{ fontSize: '1.15rem', padding: '0.8rem 1.5rem' }}>
                 <Eye size={20} /> 경매 마감 및 결과 공개
               </button>
             </>
           )}
           {gameState.auctionPhase === 'REBIDDING' && (
-             <button className="btn-primary" onClick={handleReveal}>
-                <Eye size={20} /> 재입찰 마감 및 최종 결과 공개
-             </button>
+            <button className="btn-primary" onClick={handleReveal} style={{ fontSize: '1.15rem', padding: '0.8rem 1.5rem' }}>
+              <Eye size={20} /> 재입찰 마감 및 최종 결과 공개
+            </button>
           )}
           {gameState.auctionPhase === 'REVEALING' && (
-            <button className="btn-primary" onClick={handleCompleteSale} style={{ backgroundColor: '#1a1a1a', borderColor: '#d4af37' }}>
+            <button className="btn-primary" onClick={handleCompleteSale} style={{ backgroundColor: '#1a1a1a', borderColor: '#d4af37', fontSize: '1.15rem', padding: '0.8rem 1.5rem' }}>
               <Gavel size={20} /> 낙찰 확정
             </button>
           )}
           {gameState.auctionPhase === 'TIE_BREAKER' && (
-             <div className="panel" style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: '#ef4444' }}>
-                <h4 style={{ color: '#ef4444', fontSize: '1.2rem', marginTop: 0 }}>⚔️ 최고가 동점 발생! 가위바위보 승자를 선택하세요</h4>
-                <div className="flex gap-2" style={{ flexWrap: 'wrap', marginTop: '1rem' }}>
-                   {gameState.tiedTeams?.map(tId => {
-                      const team = gameState.teams.find(t => t.id === tId);
-                      return (
-                         <button key={tId} className="btn-primary" onClick={() => socket.emit('resolveTie', tId)} style={{ backgroundColor: '#d4af37', color: '#1a1a1a', borderColor: '#fff' }}>
-                            <Gavel size={16} /> {team?.name} 승리
-                         </button>
-                      );
-                   })}
-                </div>
-             </div>
+            <div className="panel" style={{ backgroundColor: 'rgba(239,68,68,0.15)', borderColor: '#ef4444', padding: '0.8rem 1rem' }}>
+              <h4 style={{ color: '#ef4444', fontSize: '1rem', margin: '0 0 0.5rem 0' }}>⚔️ 동점! 가위바위보 승자 선택</h4>
+              <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
+                {gameState.tiedTeams?.map(tId => {
+                  const team = gameState.teams.find(t => t.id === tId);
+                  return (
+                    <button key={tId} className="btn-primary" onClick={() => socket.emit('resolveTie', tId)} style={{ backgroundColor: '#d4af37', color: '#1a1a1a', borderColor: '#fff' }}>
+                      <Gavel size={16} /> {team?.name} 승리
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
           {(gameState.auctionPhase === 'SOLD' || gameState.auctionPhase === 'NO_BIDS') && (
-            <button className="btn-primary" onClick={handleNext}>
+            <button className="btn-primary" onClick={handleNext} style={{ fontSize: '1.15rem', padding: '0.8rem 1.5rem' }}>
               <Check size={20} /> 다음 경매로
             </button>
           )}
-          <button className="btn-primary" onClick={() => setShowDashboard(true)} style={{ backgroundColor: '#10b981', borderColor: '#059669', color: '#fff' }}>
-            <FileText size={20} /> 결과 리포트
-          </button>
-          <button className="btn-primary" onClick={() => setShowTeamMgmt(true)} style={{ backgroundColor: '#6366f1', borderColor: '#4f46e5', color: '#fff' }}>
-            <Settings size={20} /> 모둠 관리
-          </button>
-          <button className="btn-primary" onClick={openCategoryConfig} style={{ backgroundColor: '#0f766e', borderColor: '#14b8a6', color: '#fff' }}>
-            <BookOpen size={20} /> 경매 설정
-          </button>
-          {gameState.auctionPhase === 'WAITING' && (
-            <button className="btn-primary" onClick={() => { if (confirm('정말로 전체 경매를 처음부터 다시 시작하시겠습니까?\n모든 입찰 결과와 예산이 초기화됩니다.')) socket.emit('resetGame'); }} style={{ backgroundColor: '#ef4444', borderColor: '#ef4444', color: '#fff' }}>
-              초기화
+
+          {/* ── 관리 도구 드롭다운 (⋮) ── */}
+          <div ref={menuRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowMenu(v => !v)}
+              style={{ background: showMenu ? 'rgba(212,175,55,0.2)' : 'transparent', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '6px', padding: '0.6rem 0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.9rem', transition: 'all 0.15s' }}
+              title="관리 도구"
+            >
+              <MoreVertical size={20} />
             </button>
-          )}
-          <button className="btn-primary" onClick={onLogout} style={{ backgroundColor: 'transparent', borderColor: '#888', color: '#aaa', padding: '0.5rem 1rem', fontSize: '1rem', marginLeft: '1rem' }}>
-            로그아웃
-          </button>
+            {showMenu && (
+              <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', backgroundColor: '#2c1608', border: '1px solid #d4af37', borderRadius: '6px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)', zIndex: 200, minWidth: '200px', overflow: 'hidden' }}>
+                <button onClick={() => { setShowDashboard(true); setShowMenu(false); }} style={menuItemStyle}>
+                  <FileText size={16} /> 결과 리포트
+                </button>
+                <button onClick={() => { setShowTeamMgmt(true); setShowMenu(false); }} style={menuItemStyle}>
+                  <Settings size={16} /> 모둠 관리
+                </button>
+                <button onClick={() => { openCategoryConfig(); setShowMenu(false); }} style={menuItemStyle}>
+                  <BookOpen size={16} /> 경매 설정
+                </button>
+                <button
+                  onClick={() => setIsProjectorMode(v => !v)}
+                  style={{ ...menuItemStyle, color: isProjectorMode ? '#d4af37' : '#ccc', backgroundColor: isProjectorMode ? 'rgba(212,175,55,0.1)' : 'transparent' }}
+                >
+                  <Eye size={16} /> 프로젝터 모드 {isProjectorMode ? 'ON ✓' : 'OFF'}
+                </button>
+                <div style={{ borderTop: '1px solid #444', margin: '4px 0' }} />
+                {gameState.auctionPhase === 'WAITING' && (
+                  <button
+                    onClick={() => { if (confirm('정말로 전체 경매를 처음부터 다시 시작하시겠습니까?\n모든 입찰 결과와 예산이 초기화됩니다.')) { socket.emit('resetGame'); setShowMenu(false); } }}
+                    style={{ ...menuItemStyle, color: '#ef4444' }}
+                  >
+                    <RefreshCw size={16} /> 전체 초기화
+                  </button>
+                )}
+                <button onClick={() => { setShowMenu(false); onLogout(); }} style={{ ...menuItemStyle, color: '#aaa' }}>
+                  로그아웃
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -472,6 +510,14 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
     </div>
   );
 }
+
+const menuItemStyle = {
+  display: 'flex', alignItems: 'center', gap: '0.5rem',
+  width: '100%', padding: '0.7rem 1rem', background: 'transparent',
+  border: 'none', color: '#f4ecd8', cursor: 'pointer',
+  fontFamily: 'inherit', fontSize: '1rem', textAlign: 'left',
+  transition: 'background 0.15s',
+};
 
 function hexToRgb(hex) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
