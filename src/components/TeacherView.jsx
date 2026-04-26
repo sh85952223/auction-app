@@ -15,7 +15,7 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
   const [showTeamMgmt, setShowTeamMgmt] = useState(false);
   const [showCategoryConfig, setShowCategoryConfig] = useState(false);
   const [editingConfig, setEditingConfig] = useState(null);
-  const [isProjectorMode, setIsProjectorMode] = useState(false);
+  const [isProjectorMode, setIsProjectorMode] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef(null);
 
