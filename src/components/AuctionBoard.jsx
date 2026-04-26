@@ -1,11 +1,7 @@
 import React from 'react';
 
 export default function AuctionBoard({ gameState, selectedItemId, onSelectItem, isTeacher }) {
-  const categories = [
-    { id: 'condition', name: '가족의 조건' },
-    { id: 'atmosphere', name: '가족의 분위기 코드' },
-    { id: 'scene', name: '필수 장면' }
-  ];
+  const categories = (gameState.categoryConfig || []).map(c => ({ id: c.id, name: c.name }));
 
   return (
     <div className="flex flex-col" style={{ gap: '1.5rem' }}>

@@ -46,6 +46,10 @@ function App() {
 
     socket.on('gameState', (state) => {
       setGameState(state);
+      // Keep connectedTeams in sync so teacher always sees correct status after refresh
+      if (state.connectedTeams) {
+        setConnectedTeams(Object.values(state.connectedTeams));
+      }
     });
 
     socket.on('bidLimits', (limits) => {
