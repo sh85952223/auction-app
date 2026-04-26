@@ -1,5 +1,6 @@
-const initialBudget = 1000;
 const { saveGameState, loadAllRooms } = require('./firebase');
+
+const defaultGameConfig = { initialBudget: 1000, bidUnit: 50 };
 
 const defaultCategoryConfig = [
   {
@@ -59,16 +60,19 @@ function buildItemsFromConfig(categoryConfig) {
         winner: null,
         winningBid: 0,
         isSold: false,
+        auctioned: false,
       });
     });
   });
   return itemList;
 }
 
-function createInitialState(categoryConfig = defaultCategoryConfig) {
+function createInitialState(categoryConfig = defaultCategoryConfig, gameConfig = defaultGameConfig) {
+  const gc = { ...defaultGameConfig, ...gameConfig };
   const wonItemsTemplate = Object.fromEntries(categoryConfig.map(c => [c.id, null]));
   return {
     categoryConfig,
+    gameConfig: gc,
     items: buildItemsFromConfig(categoryConfig),
     currentAuctionItemId: null,
     auctionPhase: 'WAITING',
@@ -76,7 +80,7 @@ function createInitialState(categoryConfig = defaultCategoryConfig) {
     teams: Array.from({length: 8}, (_, i) => ({
       id: `team_${i+1}`,
       name: `${i+1}모둠`,
-      budget: initialBudget,
+      budget: gc.initialBudget,
       hasSecretTicket: true,
       studentInfo: null,
       wonItems: { ...wonItemsTemplate }
@@ -90,6 +94,7 @@ function createInitialState(categoryConfig = defaultCategoryConfig) {
     guesses: {},
     lastGuessWinners: null,
     classInfo: null,
+    categoryWrapUp: null,
   };
 }
 
@@ -149,6 +154,7 @@ function getRemainingCategoriesNeeded(team) {
 }
 
 function calculateMaxBid(state, teamId, currentItemCategory) {
+  const bidUnit = state.gameConfig?.bidUnit || defaultGameConfig.bidUnit;
   const team = state.teams.find(t => t.id === teamId);
   if (!team) return 0;
 
@@ -156,9 +162,9 @@ function calculateMaxBid(state, teamId, currentItemCategory) {
 
   const needed = getRemainingCategoriesNeeded(team);
   const otherCategoriesNeeded = needed - 1;
-  const requiredReserve = otherCategoriesNeeded * 50;
+  const requiredReserve = otherCategoriesNeeded * bidUnit;
   const maxBid = team.budget - requiredReserve;
-  return maxBid > 0 ? Math.floor(maxBid / 50) * 50 : 0;
+  return maxBid > 0 ? Math.floor(maxBid / bidUnit) * bidUnit : 0;
 }
 
 function sanitizeState(state, forTeacher = false) {
@@ -199,6 +205,9 @@ function setupSocketHandlers(io) {
         const state = getOrCreateRoom(roomId);
         Object.assign(state, savedState, { connectedTeams: {}, teacherSocketId: null });
         if (!state.categoryConfig) state.categoryConfig = defaultCategoryConfig;
+        if (!state.gameConfig) state.gameConfig = { ...defaultGameConfig };
+        if (state.categoryWrapUp === undefined) state.categoryWrapUp = null;
+        state.items = state.items.map(item => ({ auctioned: item.isSold || false, ...item }));
       }
       const count = Object.keys(allRooms).length;
       if (count > 0) console.log(`Restored ${count} room(s) from Firebase.`);
@@ -346,6 +355,7 @@ function setupSocketHandlers(io) {
       const item = state.items.find(i => i.id === itemId);
       if (!item || item.isSold) return;
 
+      item.auctioned = true;
       state.currentAuctionItemId = itemId;
       state.auctionPhase = 'BIDDING';
       state.bids = {};
@@ -495,9 +505,64 @@ function setupSocketHandlers(io) {
       const room = getTeacherRoom();
       if (!room) return;
       const { roomId, state } = room;
+
+      const prevItemId = state.currentAuctionItemId;
+      const prevItem = prevItemId ? state.items.find(i => i.id === prevItemId) : null;
+
       state.currentAuctionItemId = null;
-      state.auctionPhase = 'WAITING';
       state.lastGuessWinners = null;
+
+      if (prevItem) {
+        const catId = prevItem.category;
+        const allAuctioned = state.items.filter(i => i.category === catId).every(i => i.auctioned);
+        if (allAuctioned) {
+          const teamsWithoutWin = state.teams.filter(t => !t.wonItems[catId]).map(t => t.id);
+          const unsoldItems = state.items.filter(i => i.category === catId && !i.isSold).map(i => i.id);
+          if (teamsWithoutWin.length > 0 && unsoldItems.length > 0) {
+            state.auctionPhase = 'CATEGORY_WRAP_UP';
+            state.categoryWrapUp = {
+              categoryId: catId,
+              categoryName: prevItem.categoryName,
+              teamsWithoutWin,
+              unsoldItems,
+            };
+            broadcastState(io, roomId);
+            return;
+          }
+        }
+      }
+
+      state.auctionPhase = 'WAITING';
+      broadcastState(io, roomId);
+    });
+
+    socket.on('categoryWrapUpAction', ({ action }) => {
+      const room = getTeacherRoom();
+      if (!room) return;
+      const { roomId, state } = room;
+      if (state.auctionPhase !== 'CATEGORY_WRAP_UP' || !state.categoryWrapUp) return;
+
+      const { categoryId, teamsWithoutWin, unsoldItems } = state.categoryWrapUp;
+
+      if (action === 'random') {
+        const shuffledTeams = [...teamsWithoutWin].sort(() => Math.random() - 0.5);
+        const shuffledItems = [...unsoldItems].sort(() => Math.random() - 0.5);
+        const pairCount = Math.min(shuffledTeams.length, shuffledItems.length);
+        for (let i = 0; i < pairCount; i++) {
+          const item = state.items.find(it => it.id === shuffledItems[i]);
+          const team = state.teams.find(t => t.id === shuffledTeams[i]);
+          if (item && team) {
+            item.isSold = true;
+            item.winner = team.id;
+            item.winningBid = 0;
+            team.wonItems[categoryId] = item.id;
+          }
+        }
+      }
+      // 'end' and 'consolation' both just return to WAITING — teacher proceeds normally
+
+      state.categoryWrapUp = null;
+      state.auctionPhase = 'WAITING';
       broadcastState(io, roomId);
     });
 
@@ -506,7 +571,7 @@ function setupSocketHandlers(io) {
       if (!room) return;
       const { roomId, state } = room;
 
-      const newState = createInitialState(state.categoryConfig);
+      const newState = createInitialState(state.categoryConfig, state.gameConfig);
       newState.teacherSocketId = state.teacherSocketId;
       newState.connectedTeams = { ...state.connectedTeams };
       newState.classInfo = state.classInfo;
@@ -520,12 +585,16 @@ function setupSocketHandlers(io) {
       console.log(`Game reset by teacher in room ${roomId}`);
     });
 
-    socket.on('updateCategoryConfig', (newConfig) => {
+    socket.on('updateCategoryConfig', (payload) => {
       const room = getTeacherRoom();
       if (!room) return;
       const { roomId, state } = room;
-      if (!Array.isArray(newConfig) || newConfig.length === 0) return;
 
+      // Support old format (array) and new format ({ categoryConfig, gameConfig })
+      const newConfig = Array.isArray(payload) ? payload : payload?.categoryConfig;
+      const newGameConfig = Array.isArray(payload) ? null : payload?.gameConfig;
+
+      if (!Array.isArray(newConfig) || newConfig.length === 0) return;
       const isValid = newConfig.every(cat =>
         cat.id && typeof cat.id === 'string' &&
         cat.name && typeof cat.name === 'string' &&
@@ -533,7 +602,17 @@ function setupSocketHandlers(io) {
       );
       if (!isValid) return;
 
-      const newState = createInitialState(newConfig);
+      if (newGameConfig) {
+        const { initialBudget, bidUnit } = newGameConfig;
+        if (!Number.isInteger(initialBudget) || initialBudget < 100 || initialBudget > 99999) return;
+        if (!Number.isInteger(bidUnit) || bidUnit < 10 || bidUnit > 1000) return;
+      }
+
+      const mergedGameConfig = newGameConfig
+        ? { ...defaultGameConfig, ...newGameConfig }
+        : (state.gameConfig || defaultGameConfig);
+
+      const newState = createInitialState(newConfig, mergedGameConfig);
       newState.teacherSocketId = state.teacherSocketId;
       newState.connectedTeams = { ...state.connectedTeams };
       newState.classInfo = state.classInfo;
@@ -544,7 +623,7 @@ function setupSocketHandlers(io) {
       rooms.set(roomId, newState);
 
       broadcastState(io, roomId);
-      console.log(`Category config updated by teacher in room ${roomId}`);
+      console.log(`Config updated by teacher in room ${roomId}`);
     });
 
     socket.on('addTeam', () => {
@@ -563,7 +642,7 @@ function setupSocketHandlers(io) {
       state.teams.push({
         id: `team_${nextIdNum}`,
         name: `${nextIdNum}모둠`,
-        budget: initialBudget,
+        budget: state.gameConfig?.initialBudget || defaultGameConfig.initialBudget,
         hasSecretTicket: true,
         studentInfo: null,
         wonItems: { ...wonItemsTemplate }
@@ -619,13 +698,14 @@ function setupSocketHandlers(io) {
       const item = state.items.find(i => i.id === state.currentAuctionItemId);
       if (!item) return;
 
+      const bidUnit = state.gameConfig?.bidUnit || defaultGameConfig.bidUnit;
       const team = state.teams.find(t => t.id === teamId);
       const maxBid = calculateMaxBid(state, teamId, item.category);
 
       let validBid = Math.max(0, parseInt(amount, 10) || 0);
-      if (validBid % 50 !== 0) validBid = Math.floor(validBid / 50) * 50;
+      if (validBid % bidUnit !== 0) validBid = Math.floor(validBid / bidUnit) * bidUnit;
       if (validBid <= 0) {
-        socket.emit('bidRejected', { reason: '최소 입찰 금액은 50 코인입니다.' });
+        socket.emit('bidRejected', { reason: `최소 입찰 금액은 ${bidUnit} 코인입니다.` });
         return;
       }
 
@@ -634,11 +714,11 @@ function setupSocketHandlers(io) {
         if (validBid + 100 <= maxBid) {
           applyTicket = true;
         } else {
-          validBid = Math.max(0, Math.floor((maxBid - 100) / 50) * 50);
+          validBid = Math.max(0, Math.floor((maxBid - 100) / bidUnit) * bidUnit);
           applyTicket = true;
         }
       } else if (validBid > maxBid) {
-        validBid = Math.floor(maxBid / 50) * 50;
+        validBid = Math.floor(maxBid / bidUnit) * bidUnit;
       }
 
       state.bids[teamId] = validBid;
@@ -670,8 +750,9 @@ function setupSocketHandlers(io) {
       if (state.auctionPhase !== 'BIDDING' && state.auctionPhase !== 'REBIDDING') return;
       if (state.bids[teamId] !== undefined) return;
 
+      const guessBidUnit = state.gameConfig?.bidUnit || defaultGameConfig.bidUnit;
       let validGuess = Math.max(0, parseInt(amount, 10) || 0);
-      if (validGuess % 50 !== 0) validGuess = Math.floor(validGuess / 50) * 50;
+      if (validGuess % guessBidUnit !== 0) validGuess = Math.floor(validGuess / guessBidUnit) * guessBidUnit;
 
       state.guesses[teamId] = validGuess;
 

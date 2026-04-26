@@ -15,13 +15,14 @@ function hexToRgb(hex) {
 }
 
 const PHASE_LABELS = {
-  WAITING:    { text: '대기 중', color: 'var(--text-2)',  bg: 'rgba(255,255,255,0.06)' },
-  BIDDING:    { text: '입찰 진행',color: 'var(--violet)', bg: 'var(--violet-dim)' },
-  REBIDDING:  { text: '재입찰',  color: 'var(--sky)',    bg: 'var(--sky-dim)' },
-  REVEALING:  { text: '결과 공개',color: 'var(--amber)', bg: 'var(--amber-dim)' },
-  TIE_BREAKER:{ text: '동점 결정',color: 'var(--rose)',  bg: 'var(--rose-dim)' },
-  NO_BIDS:    { text: '유찰',    color: 'var(--text-2)', bg: 'rgba(255,255,255,0.06)' },
-  SOLD:       { text: '낙찰 완료',color: 'var(--emerald)',bg: 'var(--emerald-dim)' },
+  WAITING:          { text: '대기 중',     color: 'var(--text-2)',  bg: 'rgba(255,255,255,0.06)' },
+  BIDDING:          { text: '입찰 진행',   color: 'var(--violet)', bg: 'var(--violet-dim)' },
+  REBIDDING:        { text: '재입찰',      color: 'var(--sky)',    bg: 'var(--sky-dim)' },
+  REVEALING:        { text: '결과 공개',   color: 'var(--amber)', bg: 'var(--amber-dim)' },
+  TIE_BREAKER:      { text: '동점 결정',   color: 'var(--rose)',  bg: 'var(--rose-dim)' },
+  NO_BIDS:          { text: '유찰',        color: 'var(--text-2)', bg: 'rgba(255,255,255,0.06)' },
+  SOLD:             { text: '낙찰 완료',   color: 'var(--emerald)',bg: 'var(--emerald-dim)' },
+  CATEGORY_WRAP_UP: { text: '카테고리 마무리', color: 'var(--sky)', bg: 'var(--sky-dim)' },
 };
 
 export default function TeacherView({ gameState, socket, teamBidStatus, connectedTeams, initialBids, sessionCode, onLogout }) {
@@ -30,6 +31,7 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
   const [showTeamMgmt, setShowTeamMgmt]         = useState(false);
   const [showCategoryConfig, setShowCategoryConfig] = useState(false);
   const [editingConfig, setEditingConfig]       = useState(null);
+  const [editingGameConfig, setEditingGameConfig] = useState(null);
   const [isProjectorMode, setIsProjectorMode]   = useState(true);
   const [showMenu, setShowMenu]                 = useState(false);
   const [codeCopied, setCodeCopied]             = useState(false);
@@ -73,13 +75,20 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
     XLSX.writeFile(wb, `${name}_경매결과.xlsx`);
   };
 
-  const openCategoryConfig = () => { setEditingConfig(JSON.parse(JSON.stringify(categoryConfig))); setShowCategoryConfig(true); };
+  const openCategoryConfig = () => {
+    setEditingConfig(JSON.parse(JSON.stringify(categoryConfig)));
+    setEditingGameConfig({ ...(gameState.gameConfig || { initialBudget: 1000, bidUnit: 50 }) });
+    setShowCategoryConfig(true);
+  };
 
   const handleApplyCategoryConfig = () => {
     if (editingConfig.some(c => !c.name.trim() || c.items.some(i => !i.trim()))) { alert('카테고리 이름과 항목을 모두 입력하세요.'); return; }
+    const { initialBudget, bidUnit } = editingGameConfig;
+    if (!initialBudget || initialBudget < 100) { alert('초기 코인은 100 이상이어야 합니다.'); return; }
+    if (!bidUnit || bidUnit < 10) { alert('입찰 단위는 10 이상이어야 합니다.'); return; }
     if (!confirm('적용 시 현재 경매가 초기화됩니다. 계속하시겠습니까?')) return;
     const sanitized = editingConfig.map(c => ({ ...c, name: c.name.trim(), items: c.items.map(i => i.trim()).filter(Boolean) })).filter(c => c.items.length > 0);
-    socket.emit('updateCategoryConfig', sanitized);
+    socket.emit('updateCategoryConfig', { categoryConfig: sanitized, gameConfig: { initialBudget: Number(initialBudget), bidUnit: Number(bidUnit) } });
     setShowCategoryConfig(false);
   };
 
@@ -236,6 +245,9 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
               <Check size={15} /> 다음 경매
             </button>
           )}
+          {phase === 'CATEGORY_WRAP_UP' && (
+            <span style={{ fontSize: '0.8rem', color: 'var(--sky)', fontWeight: 600 }}>아래 모달에서 처리 방식을 선택하세요</span>
+          )}
 
           {/* ⋮ Menu */}
           <div ref={menuRef} style={{ position: 'relative' }}>
@@ -379,6 +391,96 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
       </div>
 
       {/* ══════════════════════════════════════════════════════ */}
+      {/* Category Wrap-Up Modal */}
+      {phase === 'CATEGORY_WRAP_UP' && gameState.categoryWrapUp && (() => {
+        const wu = gameState.categoryWrapUp;
+        const teamsWithoutWin = wu.teamsWithoutWin
+          .map(id => gameState.teams.find(t => t.id === id))
+          .filter(Boolean);
+        const unsoldCount = wu.unsoldItems?.length || 0;
+        const canAssign = unsoldCount > 0;
+
+        const wrapBtnBase = {
+          flex: 1, padding: '0.85rem 1rem',
+          border: '1px solid', borderRadius: 'var(--radius-md)',
+          cursor: 'pointer', fontFamily: 'Inter,sans-serif',
+          fontSize: '0.875rem', fontWeight: 700,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem',
+          transition: 'all 0.15s', lineHeight: 1.4,
+        };
+
+        return (
+          <div style={{ ...S.modal, alignItems: 'center' }}>
+            <div style={{ ...S.modalBox, maxWidth: '520px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '1.3rem' }}>📋</span>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--sky)', letterSpacing: '-0.02em', margin: 0 }}>
+                  카테고리 마무리
+                </h2>
+              </div>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-2)', marginBottom: '1.25rem' }}>
+                <strong style={{ color: 'var(--text-1)' }}>'{wu.categoryName}'</strong> 카테고리의 모든 항목이 진행되었습니다.
+              </p>
+
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '160px', padding: '0.85rem', background: 'var(--rose-dim)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--rose)', marginBottom: '0.5rem', letterSpacing: '0.04em', textTransform: 'uppercase' }}>낙찰 미달 모둠 ({teamsWithoutWin.length})</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+                    {teamsWithoutWin.map(t => (
+                      <span key={t.id} style={{ padding: '0.2rem 0.55rem', background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 'var(--radius-full)', fontSize: '0.8rem', fontWeight: 700, color: 'var(--rose)' }}>
+                        {t.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ flex: '0 0 auto', padding: '0.85rem 1.25rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}>
+                  <div style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'JetBrains Mono,monospace', color: canAssign ? 'var(--amber)' : 'var(--text-3)' }}>{unsoldCount}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-2)' }}>유찰 항목</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+                <button
+                  style={{ ...wrapBtnBase, background: 'rgba(255,255,255,0.04)', borderColor: 'var(--border-strong)', color: 'var(--text-2)' }}
+                  onClick={() => socket.emit('categoryWrapUpAction', { action: 'end' })}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+                >
+                  <span style={{ fontSize: '1.3rem' }}>✋</span>
+                  <span>이대로 종료</span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 400, color: 'var(--text-3)' }}>낙찰 없이 다음으로</span>
+                </button>
+
+                <button
+                  disabled={!canAssign}
+                  style={{ ...wrapBtnBase, background: canAssign ? 'var(--amber-dim)' : 'rgba(255,255,255,0.02)', borderColor: canAssign ? 'rgba(245,158,11,0.4)' : 'var(--border-subtle)', color: canAssign ? 'var(--amber)' : 'var(--text-3)', cursor: canAssign ? 'pointer' : 'not-allowed', opacity: canAssign ? 1 : 0.5 }}
+                  onClick={() => canAssign && socket.emit('categoryWrapUpAction', { action: 'random' })}
+                  onMouseEnter={e => { if (canAssign) e.currentTarget.style.background = 'rgba(245,158,11,0.2)'; }}
+                  onMouseLeave={e => { if (canAssign) e.currentTarget.style.background = 'var(--amber-dim)'; }}
+                >
+                  <span style={{ fontSize: '1.3rem' }}>🎲</span>
+                  <span>무작위 배정</span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 400, color: canAssign ? 'rgba(245,158,11,0.7)' : 'var(--text-3)' }}>유찰 항목을 랜덤으로</span>
+                </button>
+
+                <button
+                  disabled={!canAssign}
+                  style={{ ...wrapBtnBase, background: canAssign ? 'var(--violet-dim)' : 'rgba(255,255,255,0.02)', borderColor: canAssign ? 'rgba(124,106,255,0.4)' : 'var(--border-subtle)', color: canAssign ? 'var(--violet)' : 'var(--text-3)', cursor: canAssign ? 'pointer' : 'not-allowed', opacity: canAssign ? 1 : 0.5 }}
+                  onClick={() => canAssign && socket.emit('categoryWrapUpAction', { action: 'consolation' })}
+                  onMouseEnter={e => { if (canAssign) e.currentTarget.style.background = 'rgba(124,106,255,0.2)'; }}
+                  onMouseLeave={e => { if (canAssign) e.currentTarget.style.background = 'var(--violet-dim)'; }}
+                >
+                  <span style={{ fontSize: '1.3rem' }}>⚔️</span>
+                  <span>재경매 진행</span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 400, color: canAssign ? 'rgba(124,106,255,0.7)' : 'var(--text-3)' }}>미달 모둠끼리 재경쟁</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ══════════════════════════════════════════════════════ */}
       {/* Result Report Modal */}
       {showDashboard && (
         <div style={S.modal}>
@@ -507,6 +609,40 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
             </button>
             <h2 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.25rem' }}>경매 설정</h2>
             <p style={{ fontSize: '0.85rem', color: 'var(--orange)', marginBottom: '1.5rem' }}>⚠️ 적용 시 현재 경매가 초기화됩니다.</p>
+
+            {/* Game Rules */}
+            {editingGameConfig && (
+              <div style={{ marginBottom: '1.5rem', padding: '1rem 1.25rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '1rem' }}>게임 규칙</div>
+                <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1, minWidth: '160px' }}>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-2)', fontWeight: 600 }}>모둠 초기 코인</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="number" min="100" max="99999" step="50"
+                        value={editingGameConfig.initialBudget}
+                        onChange={e => setEditingGameConfig(g => ({ ...g, initialBudget: parseInt(e.target.value, 10) || g.initialBudget }))}
+                        style={{ width: '100px', background: 'rgba(0,0,0,0.35)', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-sm)', color: 'var(--text-1)', padding: '0.4rem 0.6rem', fontFamily: 'JetBrains Mono,monospace', fontSize: '1rem', fontWeight: 700, outline: 'none', textAlign: 'right' }}
+                      />
+                      <span style={{ fontSize: '0.82rem', color: 'var(--text-3)' }}>코인</span>
+                    </div>
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1, minWidth: '160px' }}>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-2)', fontWeight: 600 }}>최소 입찰 단위</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <select
+                        value={editingGameConfig.bidUnit}
+                        onChange={e => setEditingGameConfig(g => ({ ...g, bidUnit: parseInt(e.target.value, 10) }))}
+                        style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-sm)', color: 'var(--text-1)', padding: '0.4rem 0.6rem', fontFamily: 'JetBrains Mono,monospace', fontSize: '1rem', fontWeight: 700, outline: 'none', cursor: 'pointer' }}
+                      >
+                        {[10, 25, 50, 100, 200].map(v => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                      <span style={{ fontSize: '0.82rem', color: 'var(--text-3)' }}>코인 단위</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
               {editingConfig.map((cat, ci) => {

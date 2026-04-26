@@ -22,6 +22,7 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
   const { bidAmount, bidSubmitted, errorMsg, useSecretTicket, mode, guessAmount } = form;
 
   const team = gameState.teams.find(t => t.id === teamId);
+  const bidUnit = gameState.gameConfig?.bidUnit || 50;
   const currentItem = gameState.currentAuctionItemId
     ? gameState.items.find(i => i.id === gameState.currentAuctionItemId)
     : null;
@@ -36,19 +37,19 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
 
   const adjustBid = (d) => {
     const cur = parseInt(bidAmount, 10) || 0;
-    dispatch({ type: 'BID_AMT', v: String(Math.round(clamp(cur + d, bidLimits.maxBid) / 50) * 50) });
+    dispatch({ type: 'BID_AMT', v: String(Math.round(clamp(cur + d, bidLimits.maxBid) / bidUnit) * bidUnit) });
   };
 
   const adjustGuess = (d) => {
     const cur = parseInt(guessAmount, 10) || 0;
-    dispatch({ type: 'GUESS_AMT', v: String(Math.round(Math.max(0, cur + d) / 50) * 50) });
+    dispatch({ type: 'GUESS_AMT', v: String(Math.round(Math.max(0, cur + d) / bidUnit) * bidUnit) });
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     const amount = parseInt(bidAmount, 10);
-    if (isNaN(amount) || amount < 50) { dispatch({ type: 'SET_ERROR', v: '최소 50 코인 이상 입력하세요.' }); return; }
-    if (amount % 50 !== 0) { dispatch({ type: 'SET_ERROR', v: '50 코인 단위로 입력해야 합니다.' }); return; }
+    if (isNaN(amount) || amount < bidUnit) { dispatch({ type: 'SET_ERROR', v: `최소 ${bidUnit} 코인 이상 입력하세요.` }); return; }
+    if (amount % bidUnit !== 0) { dispatch({ type: 'SET_ERROR', v: `${bidUnit} 코인 단위로 입력해야 합니다.` }); return; }
     const maxBid = (gameState.auctionPhase === 'BIDDING' && useSecretTicket && team.hasSecretTicket)
       ? bidLimits.maxBid - 100 : bidLimits.maxBid;
     if (amount > maxBid) { dispatch({ type: 'SET_ERROR', v: `최대 ${maxBid} 코인까지 입찰 가능합니다.` }); return; }
@@ -60,7 +61,7 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
     e.preventDefault();
     const amount = parseInt(guessAmount, 10);
     if (isNaN(amount) || amount < 0) { dispatch({ type: 'SET_ERROR', v: '올바른 금액을 입력하세요.' }); return; }
-    if (amount % 50 !== 0) { dispatch({ type: 'SET_ERROR', v: '50 코인 단위로 입력해야 합니다.' }); return; }
+    if (amount % bidUnit !== 0) { dispatch({ type: 'SET_ERROR', v: `${bidUnit} 코인 단위로 입력해야 합니다.` }); return; }
     socket.emit('submitGuess', { amount });
     dispatch({ type: 'SUBMITTED' });
   };
@@ -170,7 +171,7 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
                       <span>입찰 금액 (코인)</span>
                       <span style={{ color: 'var(--amber)' }}>최대 {bidLimits.maxBid}</span>
                     </div>
-                    <input type="range" min="0" max={bidLimits.maxBid || 1} step="50"
+                    <input type="range" min="0" max={bidLimits.maxBid || 1} step={bidUnit}
                       value={parseInt(bidAmount,10)||0}
                       onChange={e => dispatch({ type: 'BID_AMT', v: e.target.value })}
                       disabled={bidLimits.maxBid === 0}
@@ -178,11 +179,11 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
                     />
                     <input type="number" className="input-field"
                       value={bidAmount} onChange={e => dispatch({ type: 'BID_AMT', v: e.target.value })}
-                      placeholder="0" min="0" max={bidLimits.maxBid} step="50" autoFocus
+                      placeholder="0" min="0" max={bidLimits.maxBid} step={bidUnit} autoFocus
                       style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: '1.6rem', fontWeight: 700, textAlign: 'right', marginBottom: '0.5rem' }}
                     />
                     <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.75rem' }}>
-                      {[50,100,200,500].map(d => <QuickBtn key={d} label={`+${d}`} onClick={() => adjustBid(d)} />)}
+                      {[1,2,4,10].map(m => <QuickBtn key={m} label={`+${bidUnit*m}`} onClick={() => adjustBid(bidUnit*m)} />)}
                       <QuickBtn label="MAX" onClick={() => dispatch({ type: 'BID_AMT', v: String(bidLimits.maxBid) })} />
                     </div>
 
@@ -223,11 +224,11 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-2)', marginBottom: '0.4rem' }}>예상 낙찰가 (코인)</div>
                     <input type="number" className="input-field"
                       value={guessAmount} onChange={e => dispatch({ type: 'GUESS_AMT', v: e.target.value })}
-                      placeholder="0" min="0" step="50" autoFocus
+                      placeholder="0" min="0" step={bidUnit} autoFocus
                       style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: '1.6rem', fontWeight: 700, textAlign: 'right', marginBottom: '0.5rem' }}
                     />
                     <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.75rem' }}>
-                      {[50,100,200,500].map(d => <QuickBtn key={d} label={`+${d}`} onClick={() => adjustGuess(d)} color="var(--sky)" />)}
+                      {[1,2,4,10].map(m => <QuickBtn key={m} label={`+${bidUnit*m}`} onClick={() => adjustGuess(bidUnit*m)} color="var(--sky)" />)}
                     </div>
                     {errorMsg && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--rose)', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>

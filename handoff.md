@@ -1,6 +1,6 @@
 # Auction App — 개발 Handoff 문서
 
-> 마지막 업데이트: 2026-04-26  
+> 마지막 업데이트: 2026-04-26 (세션 2)
 > 대상 브랜치: `main` (origin보다 7 커밋 앞)
 
 ---
@@ -187,6 +187,57 @@ cd auction-app && npm run dev   # Vite :5173
 
 ---
 
-## 미처리 항목 (없음)
+---
 
-ISSUES.md의 P0~P3 항목 전체 완료. 추가 개선이 필요하다면 새 이슈를 ISSUES.md에 추가할 것.
+## 세션 2 변경사항 (2026-04-26)
+
+### 1. 세션 코드 기반 룸 격리
+
+**문제:** `roomId = "${grade}-${classNum}"` 구조라 다른 학교 교사가 같은 학년/반 입력 시 룸 충돌.
+
+**해결:** 교사 입장 시 서버가 6자리 랜덤 코드(예: `AB3X7K`) 발급 → 이게 roomId가 됨.
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `server/gameLogic.js` | `makeRoomId` 제거 → `generateSessionCode()` 추가. 교사 joinAs 시 신규/재접속 분기. `getTeamsForClass`가 `{sessionCode}` 수신. 학생 joinAs도 sessionCode로 룸 조회. |
+| `src/App.jsx` | `sessionCode` state 추가, `sessionCode` 소켓 이벤트 수신 후 localStorage 저장. 세션 복원 시 sessionCode 포함해 재전송. |
+| `src/components/Lobby.jsx` | 학생 TEAM_CLASS 단계 → 세션 코드 입력(6자리 대문자) 단계로 교체. |
+| `src/components/TeacherView.jsx` | 헤더에 세션 코드 뱃지 표시 (클릭 시 클립보드 복사). |
+
+**재접속 흐름:** 교사 localStorage에 `auctionSessionCode` 저장 → 재접속 시 동일 코드로 기존 룸 재진입. 학생도 동일.
+
+---
+
+### 2. 전체 UI 리디자인
+
+기존 Playfair Display + 나무/양피지 테마 → 현대적 다크 SaaS 디자인으로 전면 교체.
+
+| 항목 | 변경 |
+|------|------|
+| 폰트 | Playfair Display → **Inter + JetBrains Mono** |
+| 색상 | 나무색/금색 → 딥 인디고 배경 + 퍼플/앰버/스카이 액센트 |
+| CSS | `index.css` 전면 재작성 (CSS 변수 토큰 체계, 유틸리티 클래스) |
+| Lobby | 역할 카드 선택 UI, 세션코드 대형 Mono 입력 |
+| TeacherView | 스티키 헤더 + 팀 사이드바 + 모달 블러 배경 |
+| StudentView | 코인 항상 표시, 세그먼트 컨트롤 탭, 제출 완료 애니메이션 |
+| AuctionBoard | 카테고리별 컬러 도트 헤더, 아이템 카드 hover 효과 |
+
+---
+
+### 3. 엑셀 내보내기 (`xlsx` 패키지)
+
+결과 리포트 모달에 "엑셀로 내보내기" 버튼 추가.
+컬럼: 모둠명 / 학년 / 반 / 모둠원 / 남은예산 / [카테고리별] 낙찰항목·금액 / 총사용금액.
+
+---
+
+### 4. 미해결 설계 질문 (다음 세션 논의 필요)
+
+**유찰·미낙찰 처리 정책:**
+- 유찰(NO_BIDS) 시 아이템은 `isSold=false`로 남음 → 교사가 다시 선택해 재경매 가능 (현행)
+- 끝까지 아무것도 낙찰받지 못한 모둠 → 별도 처리 없음, 코인만 남음 (현행)
+- **결정 필요:** 강제 재경매 큐, 미낙찰 모둠 무작위 배정 등 추가할지 여부
+
+## 미처리 항목
+
+위 설계 질문 외 없음.
