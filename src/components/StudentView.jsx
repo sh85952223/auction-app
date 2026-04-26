@@ -1,15 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useReducer, useEffect } from 'react';
 import { Gavel, AlertCircle } from 'lucide-react';
 import AuctionBoard from './AuctionBoard';
 
-export default function StudentView({ gameState, socket, teamId, bidLimits, initialBids, onLogout }) {
-  const [bidAmount, setBidAmount] = useState('');
-  const [bidSubmitted, setBidSubmitted] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [useSecretTicket, setUseSecretTicket] = useState(false);
-  // 'BID' | 'GUESS' — default is BID (no intersticial)
-  const [mode, setMode] = useState('BID');
-  const [guessAmount, setGuessAmount] = useState('');
+const INIT_FORM = { bidAmount: '', bidSubmitted: false, errorMsg: '', useSecretTicket: false, mode: 'BID', guessAmount: '' };
+
+function formReducer(state, action) {
+  switch (action.type) {
+    case 'RESET': return INIT_FORM;
+    case 'SET_BID_AMOUNT': return { ...state, bidAmount: action.value, errorMsg: '' };
+    case 'SET_GUESS_AMOUNT': return { ...state, guessAmount: action.value, errorMsg: '' };
+    case 'SET_MODE': return { ...state, mode: action.value, errorMsg: '' };
+    case 'SET_SECRET': return { ...state, useSecretTicket: action.value };
+    case 'SET_ERROR': return { ...state, errorMsg: action.value };
+    case 'SUBMITTED': return { ...state, bidSubmitted: true, errorMsg: '' };
+    default: return state;
+  }
+}
+
+export default function StudentView({ gameState, socket, teamId, bidLimits, initialBids, connectedTeams, onLogout }) {
+  const [form, dispatch] = useReducer(formReducer, INIT_FORM);
+  const { bidAmount, bidSubmitted, errorMsg, useSecretTicket, mode, guessAmount } = form;
 
   const team = gameState.teams.find(t => t.id === teamId);
   const currentItem = gameState.currentAuctionItemId
@@ -17,20 +27,8 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
     : null;
 
   useEffect(() => {
-    if (gameState.auctionPhase === 'BIDDING') {
-      setBidAmount('');
-      setBidSubmitted(false);
-      setErrorMsg('');
-      setUseSecretTicket(false);
-      setMode('BID');
-      setGuessAmount('');
-    } else if (gameState.auctionPhase === 'REBIDDING') {
-      setBidAmount('');
-      setBidSubmitted(false);
-      setErrorMsg('');
-      setUseSecretTicket(false);
-      setGuessAmount('');
-      setMode('BID');
+    if (gameState.auctionPhase === 'BIDDING' || gameState.auctionPhase === 'REBIDDING') {
+      dispatch({ type: 'RESET' });
     }
   }, [gameState.auctionPhase]);
 
@@ -38,8 +36,12 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
   const adjustBid = (delta) => {
     const current = parseInt(bidAmount, 10) || 0;
     const next = Math.max(0, Math.min(bidLimits.maxBid, current + delta));
-    const snapped = Math.round(next / 50) * 50;
-    setBidAmount(String(snapped));
+    dispatch({ type: 'SET_BID_AMOUNT', value: String(Math.round(next / 50) * 50) });
+  };
+
+  const adjustGuess = (delta) => {
+    const current = parseInt(guessAmount, 10) || 0;
+    dispatch({ type: 'SET_GUESS_AMOUNT', value: String(Math.round(Math.max(0, current + delta) / 50) * 50) });
   };
 
   const handleSubmit = (e) => {
@@ -47,11 +49,11 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
     const amount = parseInt(bidAmount, 10);
 
     if (isNaN(amount) || amount < 50) {
-      setErrorMsg('최소 50 코인 이상 입력해주세요.');
+      dispatch({ type: 'SET_ERROR', value: '최소 50 코인 이상 입력해주세요.' });
       return;
     }
     if (amount % 50 !== 0) {
-      setErrorMsg('입찰 금액은 50 코인 단위로 입력해야 합니다.');
+      dispatch({ type: 'SET_ERROR', value: '입찰 금액은 50 코인 단위로 입력해야 합니다.' });
       return;
     }
 
@@ -60,13 +62,12 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
       : bidLimits.maxBid;
 
     if (amount > actualMaxBid) {
-      setErrorMsg(`최대 입찰 가능 금액은 ${actualMaxBid} 코인입니다.`);
+      dispatch({ type: 'SET_ERROR', value: `최대 입찰 가능 금액은 ${actualMaxBid} 코인입니다.` });
       return;
     }
 
     socket.emit('submitBid', { amount, useSecretTicket: useSecretTicket && team.hasSecretTicket });
-    setBidSubmitted(true);
-    setErrorMsg('');
+    dispatch({ type: 'SUBMITTED' });
   };
 
   const handleGuessSubmit = (e) => {
@@ -74,17 +75,16 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
     const amount = parseInt(guessAmount, 10);
 
     if (isNaN(amount) || amount < 0) {
-      setErrorMsg('올바른 금액을 입력하세요.');
+      dispatch({ type: 'SET_ERROR', value: '올바른 금액을 입력하세요.' });
       return;
     }
     if (amount % 50 !== 0) {
-      setErrorMsg('예측 금액은 50 코인 단위로 입력해야 합니다.');
+      dispatch({ type: 'SET_ERROR', value: '예측 금액은 50 코인 단위로 입력해야 합니다.' });
       return;
     }
 
     socket.emit('submitGuess', { amount });
-    setBidSubmitted(true);
-    setErrorMsg('');
+    dispatch({ type: 'SUBMITTED' });
   };
 
   const isBiddingPhase = gameState.auctionPhase === 'BIDDING' || gameState.auctionPhase === 'REBIDDING';
@@ -153,14 +153,14 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
               <div style={{ display: 'flex', borderRadius: '6px', overflow: 'hidden', border: '1px solid #d4af37', marginBottom: '1.2rem' }}>
                 <button
                   type="button"
-                  onClick={() => { setMode('BID'); setErrorMsg(''); }}
+                  onClick={() => dispatch({ type: 'SET_MODE', value: 'BID' })}
                   style={{ flex: 1, padding: '0.7rem', background: mode === 'BID' ? '#d4af37' : 'transparent', color: mode === 'BID' ? '#1a1a1a' : '#d4af37', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 'bold', fontSize: '1rem', transition: 'all 0.15s' }}
                 >
                   💰 경매 참여
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setMode('GUESS'); setErrorMsg(''); }}
+                  onClick={() => dispatch({ type: 'SET_MODE', value: 'GUESS' })}
                   style={{ flex: 1, padding: '0.7rem', background: mode === 'GUESS' ? '#60a5fa' : 'transparent', color: mode === 'GUESS' ? '#1a1a1a' : '#60a5fa', border: 'none', borderLeft: '1px solid #d4af37', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 'bold', fontSize: '1rem', transition: 'all 0.15s' }}
                 >
                   🤔 입찰 포기 + 예측
@@ -175,13 +175,23 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
                     <span style={{ color: '#d4af37' }}>최대: {bidLimits.maxBid}</span>
                   </div>
 
-                  {/* Amount input + quick-add buttons */}
+                  {/* Slider + number input */}
+                  <input
+                    type="range"
+                    min="0"
+                    max={bidLimits.maxBid || 1}
+                    step="50"
+                    value={parseInt(bidAmount, 10) || 0}
+                    onChange={(e) => dispatch({ type: 'SET_BID_AMOUNT', value: e.target.value })}
+                    disabled={bidLimits.maxBid === 0}
+                    style={{ width: '100%', marginBottom: '0.5rem', accentColor: '#d4af37', cursor: bidLimits.maxBid === 0 ? 'not-allowed' : 'pointer' }}
+                  />
                   <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.7rem', alignItems: 'center' }}>
                     <input
                       type="number"
                       className="input-field"
                       value={bidAmount}
-                      onChange={(e) => setBidAmount(e.target.value)}
+                      onChange={(e) => dispatch({ type: 'SET_BID_AMOUNT', value: e.target.value })}
                       placeholder="0"
                       min="0"
                       max={bidLimits.maxBid}
@@ -203,7 +213,7 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
                     ))}
                     <button
                       type="button"
-                      onClick={() => setBidAmount(String(bidLimits.maxBid))}
+                      onClick={() => dispatch({ type: 'SET_BID_AMOUNT', value: String(bidLimits.maxBid) })}
                       style={{ flex: 1, background: 'rgba(212,175,55,0.12)', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '4px', padding: '0.4rem 0', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.9rem' }}
                     >
                       MAX
@@ -216,7 +226,7 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
                         <input
                           type="checkbox"
                           checked={useSecretTicket}
-                          onChange={(e) => setUseSecretTicket(e.target.checked)}
+                          onChange={(e) => dispatch({ type: 'SET_SECRET', value: e.target.checked })}
                           style={{ width: '20px', height: '20px' }}
                         />
                         <span style={{ fontSize: '1.05rem', color: '#60a5fa', fontWeight: 'bold' }}>시크릿 해제권 사용 (-100 코인)</span>
@@ -262,7 +272,7 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
                     type="number"
                     className="input-field"
                     value={guessAmount}
-                    onChange={(e) => setGuessAmount(e.target.value)}
+                    onChange={(e) => dispatch({ type: 'SET_GUESS_AMOUNT', value: e.target.value })}
                     placeholder="0"
                     min="0"
                     step="50"
@@ -274,10 +284,7 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
                       <button
                         key={d}
                         type="button"
-                        onClick={() => {
-                          const c = parseInt(guessAmount, 10) || 0;
-                          setGuessAmount(String(Math.round(Math.max(0, c + d) / 50) * 50));
-                        }}
+                        onClick={() => adjustGuess(d)}
                         style={{ flex: 1, background: 'rgba(96,165,250,0.12)', border: '1px solid #60a5fa', color: '#60a5fa', borderRadius: '4px', padding: '0.4rem 0', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.9rem' }}
                       >
                         +{d}
@@ -339,6 +346,42 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
         </div>
       ) : (
         <div style={{ opacity: gameState.auctionPhase === 'SOLD' ? 1 : 0.9 }}>
+          {/* ── 대기실: 경매 시작 전 ── */}
+          {gameState.auctionPhase === 'WAITING' && (
+            <div className="panel" style={{ textAlign: 'center', marginBottom: '1.5rem', padding: '2rem' }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>⏳</div>
+              <h3 className="gold-text" style={{ fontSize: '1.6rem', margin: '0 0 0.5rem 0' }}>재판장이 경매를 준비 중입니다</h3>
+              <p style={{ color: '#aaa', margin: '0 0 1.5rem 0' }}>경매 항목이 선택되면 자동으로 시작됩니다.</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', justifyContent: 'center' }}>
+                {gameState.teams.map(t => {
+                  const online = connectedTeams && connectedTeams.includes(t.id);
+                  const isMe = t.id === teamId;
+                  return (
+                    <div
+                      key={t.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.4rem',
+                        padding: '0.4rem 0.9rem', borderRadius: '999px',
+                        border: `1px solid ${isMe ? '#d4af37' : online ? '#4ade80' : '#444'}`,
+                        backgroundColor: isMe ? 'rgba(212,175,55,0.12)' : online ? 'rgba(74,222,128,0.07)' : 'rgba(0,0,0,0.3)',
+                        fontSize: '0.95rem',
+                        color: isMe ? '#d4af37' : online ? '#4ade80' : '#555',
+                      }}
+                    >
+                      <span style={{
+                        width: '8px', height: '8px', borderRadius: '50%',
+                        backgroundColor: online ? '#4ade80' : '#555',
+                        flexShrink: 0,
+                        boxShadow: online ? '0 0 6px #4ade80' : 'none',
+                      }} />
+                      {t.name}{isMe ? ' (나)' : ''}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {gameState.auctionPhase === 'SOLD' && currentItem && (
             <div className="panel stamp-anim" style={{ textAlign: 'center', marginBottom: '2rem', backgroundColor: 'rgba(212,175,55,0.15)' }}>
               <h2 className="gold-text" style={{ margin: 0, fontSize: '1.8rem' }}>

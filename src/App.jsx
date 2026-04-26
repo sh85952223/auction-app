@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import Lobby from './components/Lobby';
 import TeacherView from './components/TeacherView';
@@ -13,8 +13,39 @@ function App() {
   const [role, setRole] = useState(null); // 'teacher' or 'team'
   const [teamId, setTeamId] = useState(null);
   const [bidLimits, setBidLimits] = useState({ maxBid: 0 });
-  const [teamBidStatus, setTeamBidStatus] = useState({}); // track who has bid internally if needed
+  const [teamBidStatus, setTeamBidStatus] = useState({});
   const [connectedTeams, setConnectedTeams] = useState([]);
+
+  const handleJoin = (selectedRole, selectedTeamId = null, extraInfo = null, pin = null) => {
+    if (selectedRole === 'teacher') {
+      localStorage.setItem('auctionRole', 'teacher');
+      if (pin) localStorage.setItem('auctionPin', pin);
+      if (extraInfo) localStorage.setItem('auctionClassInfo', JSON.stringify(extraInfo));
+    } else if (selectedRole === 'team') {
+      localStorage.setItem('auctionRole', 'team');
+      localStorage.setItem('auctionTeamId', selectedTeamId);
+      if (extraInfo) {
+        localStorage.setItem('auctionStudentInfo', JSON.stringify(extraInfo));
+      }
+    }
+
+    setRole(selectedRole);
+    if (selectedRole === 'team') {
+      setTeamId(selectedTeamId);
+    }
+    socket.emit('joinAs', { role: selectedRole, teamId: selectedTeamId, classInfo: selectedRole === 'teacher' ? extraInfo : null, studentInfo: selectedRole === 'team' ? extraInfo : null, pin });
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('auctionRole');
+    localStorage.removeItem('auctionTeamId');
+    localStorage.removeItem('auctionStudentInfo');
+    localStorage.removeItem('auctionPin');
+    localStorage.removeItem('auctionClassInfo');
+    setRole(null);
+    setTeamId(null);
+    window.location.reload();
+  };
 
   useEffect(() => {
     // Session restoration — wait for socket connection (issue #10)
@@ -24,7 +55,7 @@ function App() {
         const savedPin = localStorage.getItem('auctionPin');
         const savedClassInfo = localStorage.getItem('auctionClassInfo');
         let classInfo = null;
-        try { if (savedClassInfo) classInfo = JSON.parse(savedClassInfo); } catch(e) {}
+        try { if (savedClassInfo) classInfo = JSON.parse(savedClassInfo); } catch { /* invalid JSON, skip */ }
         if (savedPin) handleJoin('teacher', null, classInfo, savedPin);
       } else if (savedRole === 'team') {
         const savedTeamId = localStorage.getItem('auctionTeamId');
@@ -32,7 +63,7 @@ function App() {
         if (savedTeamId && savedStudentInfo) {
           try {
             handleJoin('team', savedTeamId, JSON.parse(savedStudentInfo));
-          } catch(e) {
+          } catch (e) {
             console.error('Failed to parse student info', e);
           }
         }
@@ -46,7 +77,6 @@ function App() {
 
     socket.on('gameState', (state) => {
       setGameState(state);
-      // Keep connectedTeams in sync so teacher always sees correct status after refresh
       if (state.connectedTeams) {
         setConnectedTeams(Object.values(state.connectedTeams));
       }
@@ -55,15 +85,15 @@ function App() {
     socket.on('bidLimits', (limits) => {
       setBidLimits(limits);
     });
-    
+
     socket.on('connectedTeams', (teams) => {
-       setConnectedTeams(teams);
+      setConnectedTeams(teams);
     });
 
-    socket.on('teamBidStatus', ({ teamId, hasBid, requestedTicket, isGuess }) => {
-      setTeamBidStatus(prev => ({ ...prev, [teamId]: { hasBid, requestedTicket, isGuess } }));
+    socket.on('teamBidStatus', ({ teamId: tid, hasBid, requestedTicket, isGuess }) => {
+      setTeamBidStatus(prev => ({ ...prev, [tid]: { hasBid, requestedTicket, isGuess } }));
     });
-    
+
     socket.on('bidsUpdated', (teamsWhoBid) => {
       setTeamBidStatus(prev => {
         const statusObj = {};
@@ -101,38 +131,7 @@ function App() {
       socket.off('initialBids');
       socket.off('authError');
     };
-  }, []);
-
-  const handleJoin = (selectedRole, selectedTeamId = null, extraInfo = null, pin = null) => {
-    if (selectedRole === 'teacher') {
-      localStorage.setItem('auctionRole', 'teacher');
-      if (pin) localStorage.setItem('auctionPin', pin);
-      if (extraInfo) localStorage.setItem('auctionClassInfo', JSON.stringify(extraInfo));
-    } else if (selectedRole === 'team') {
-      localStorage.setItem('auctionRole', 'team');
-      localStorage.setItem('auctionTeamId', selectedTeamId);
-      if (extraInfo) {
-        localStorage.setItem('auctionStudentInfo', JSON.stringify(extraInfo));
-      }
-    }
-
-    setRole(selectedRole);
-    if (selectedRole === 'team') {
-      setTeamId(selectedTeamId);
-    }
-    socket.emit('joinAs', { role: selectedRole, teamId: selectedTeamId, classInfo: selectedRole === 'teacher' ? extraInfo : null, studentInfo: selectedRole === 'team' ? extraInfo : null, pin });
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('auctionRole');
-    localStorage.removeItem('auctionTeamId');
-    localStorage.removeItem('auctionStudentInfo');
-    localStorage.removeItem('auctionPin');
-    localStorage.removeItem('auctionClassInfo');
-    setRole(null);
-    setTeamId(null);
-    window.location.reload();
-  };
+  }, []); // socket listeners are set up once on mount
 
   if (!role) {
     return <Lobby onJoin={handleJoin} connectedTeams={connectedTeams} teams={gameState?.teams || []} />;
@@ -145,22 +144,23 @@ function App() {
   return (
     <div className="courtroom-container">
       {role === 'teacher' ? (
-        <TeacherView 
-          gameState={gameState} 
-          socket={socket} 
-          teamBidStatus={teamBidStatus} 
-          connectedTeams={connectedTeams} 
+        <TeacherView
+          gameState={gameState}
+          socket={socket}
+          teamBidStatus={teamBidStatus}
+          connectedTeams={connectedTeams}
           initialBids={initialBids}
           onLogout={handleLogout}
         />
       ) : (
-        <StudentView 
-          gameState={gameState} 
-          socket={socket} 
-          teamId={teamId} 
-          bidLimits={bidLimits} 
+        <StudentView
+          gameState={gameState}
+          socket={socket}
+          teamId={teamId}
+          bidLimits={bidLimits}
           teamBidStatus={teamBidStatus}
           initialBids={initialBids}
+          connectedTeams={connectedTeams}
           onLogout={handleLogout}
         />
       )}
