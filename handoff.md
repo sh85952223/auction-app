@@ -38,22 +38,24 @@
   - `showMenu` state + `menuRef` + `useEffect` click-outside 감지로 구현
   - `menuItemStyle` 상수를 파일 하단(`hexToRgb` 함수 위)에 정의
 
+### 4. StudentView.jsx — 대기실 피드백 (완료)
+**커밋**: `59a596b`  
+- `gameState.auctionPhase === 'WAITING'` 분기에 대기 카드 추가
+- 전체 팀 목록을 pill 형태로 표시, 접속 중인 팀은 초록 glow 인디케이터
+- 내 팀은 금색 강조 + "(나)" 레이블
+- `connectedTeams` prop을 App.jsx에서 StudentView로 추가 전달
+
+### 5. StudentView.jsx — 슬라이더 + useReducer 리팩터 (완료)
+**커밋**: `59a596b`  
+- BID 폼에 `<input type="range">` 슬라이더 추가 (max=bidLimits.maxBid, step=50)
+- 퀵버튼 `+50/+100/+200/+500/MAX` 위에 배치
+- 6개 독립 useState → `useReducer(formReducer)` 단일 상태로 통합
+  - actions: RESET / SET_BID_AMOUNT / SET_GUESS_AMOUNT / SET_MODE / SET_SECRET / SET_ERROR / SUBMITTED
+  - effect 내 단일 dispatch 호출로 `react-hooks/set-state-in-effect` 에러 해소
+
 ---
 
-## 남은 개선 과제 (미구현)
-
-### 4. 실시간 대기실 피드백 (우선순위: 중)
-**목표**: 학생이 팀 선택 후 입장하면 "재판장이 경매를 시작할 때까지 대기 중..." 대기 화면 표시  
-**위치**: `StudentView.jsx` 내 `gameState.auctionPhase === 'WAITING'` 분기  
-**구현 방향**:
-- 현재 대기 중엔 AuctionBoard만 보임 → 별도 대기 카드 추가
-- connectedTeams 목록을 보여줘 "다른 모둠도 접속 중" 확인 가능하게
-- 팀 이름 + 초록 펄스 인디케이터 표시
-
-### 5. 모바일 입찰 UX 추가 개선 (우선순위: 낮)
-- 슬라이더(`<input type="range">`) 를 퀵버튼 위에 추가 검토
-- 현재 퀵버튼만으로도 충분히 개선되었으나, 큰 금액대에서 슬라이더가 더 직관적일 수 있음
-- `bidLimits.maxBid`를 max로, step=50으로 설정
+## 남은 개선 과제
 
 ---
 
