@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import AuctionBoard from './AuctionBoard';
-import { Gavel, Play, Eye, Check, FileText, X, Settings, UserPlus, Trash2, RefreshCw, BookOpen, PlusCircle, MoreVertical } from 'lucide-react';
+import { Gavel, Play, Eye, Check, FileText, X, Settings, UserPlus, Trash2, RefreshCw, BookOpen, PlusCircle, MoreVertical, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 // Category colors for consistent styling
 const CAT_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#a855f7', '#ef4444', '#06b6d4'];
@@ -48,6 +49,36 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
   const handleNext = () => {
     setSelectedItemId(null);
     socket.emit('nextItem');
+  };
+
+  const handleExportExcel = () => {
+    const rows = gameState.teams.map(team => {
+      const row = {
+        '모둠명': team.name,
+        '학년': team.studentInfo?.grade ?? '',
+        '반': team.studentInfo?.classNum ?? '',
+        '모둠원': team.studentInfo?.members ?? '',
+        '남은 예산(코인)': team.budget,
+      };
+      let totalSpent = 0;
+      categoryConfig.forEach(cat => {
+        const itemId = team.wonItems?.[cat.id];
+        const item = itemId ? gameState.items.find(i => i.id === itemId) : null;
+        row[`[${cat.name}] 낙찰 항목`] = item?.name ?? '';
+        row[`[${cat.name}] 낙찰 금액`] = item?.winningBid ?? '';
+        totalSpent += item?.winningBid || 0;
+      });
+      row['총 사용 금액(코인)'] = totalSpent;
+      return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    const sheetName = gameState.classInfo
+      ? `${gameState.classInfo.grade}학년${gameState.classInfo.classNum}반`
+      : '경매결과';
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.writeFile(wb, `${sheetName}_경매결과.xlsx`);
   };
 
   const openCategoryConfig = () => {
@@ -342,9 +373,14 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
              <button onClick={() => setShowDashboard(false)} style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'transparent', border: 'none', color: '#ccc', cursor: 'pointer' }}>
                <X size={32} />
              </button>
-             <h2 className="gold-text" style={{ textAlign: 'center', fontSize: '2.5rem', marginBottom: '2rem', borderBottom: '2px solid #d4af37', paddingBottom: '1rem' }}>
+             <h2 className="gold-text" style={{ textAlign: 'center', fontSize: '2.5rem', marginBottom: '1rem', borderBottom: '2px solid #d4af37', paddingBottom: '1rem' }}>
                {gameState.classInfo ? `${gameState.classInfo.grade}학년 ${gameState.classInfo.classNum}반 ` : ''}경매 최종 결과 리포트
              </h2>
+             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+               <button onClick={handleExportExcel} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#217346', border: '1px solid #34a85a', color: '#fff', padding: '0.6rem 1.4rem', borderRadius: '6px', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold' }}>
+                 <Download size={18} /> 엑셀로 내보내기
+               </button>
+             </div>
              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
                {gameState.teams.map(team => {
                  const wonEntries = categoryConfig.map((cat, catIdx) => {
