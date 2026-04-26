@@ -167,7 +167,12 @@ function App() {
   }
 
   if (!gameState) {
-    return <div className="courtroom-container items-center justify-center"><h2>재판소 접속 중... (상태 로딩중)</h2></div>;
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-base)', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ width: 40, height: 40, border: '3px solid var(--border-default)', borderTopColor: 'var(--violet)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <p style={{ color: 'var(--text-2)', fontSize: '0.9rem' }}>접속 중...</p>
+      </div>
+    );
   }
 
   return (
