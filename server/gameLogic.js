@@ -81,6 +81,7 @@ function createInitialState(categoryConfig = defaultCategoryConfig) {
       studentInfo: null,
       wonItems: { ...wonItemsTemplate }
     })),
+    teamCounter: 8, // addTeam 시 단조증가 ID 보장용
     teacherSocketId: null,
     connectedTeams: {},
     secretTicketRequests: {},
@@ -203,6 +204,15 @@ function setupSocketHandlers(io) {
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
+    // per-socket 이벤트 스로틀 — 동일 이벤트가 limitMs 내 재호출되면 무시
+    const _lastEventTime = {};
+    function isThrottled(eventName, limitMs) {
+      const now = Date.now();
+      if (_lastEventTime[eventName] && now - _lastEventTime[eventName] < limitMs) return true;
+      _lastEventTime[eventName] = now;
+      return false;
+    }
+
     // 학생이 팀 목록 요청 시 해당 반의 팀 목록 반환
     socket.on('getTeamsForClass', ({ grade, classNum }) => {
       const roomId = makeRoomId({ grade, classNum });
@@ -323,6 +333,7 @@ function setupSocketHandlers(io) {
     };
 
     socket.on('startAuctionFor', (itemId) => {
+      if (isThrottled('startAuctionFor', 1000)) return;
       const room = getTeacherRoom();
       if (!room) return;
       const { roomId, state } = room;
@@ -348,6 +359,7 @@ function setupSocketHandlers(io) {
     });
 
     socket.on('revealBids', () => {
+      if (isThrottled('revealBids', 1000)) return;
       const room = getTeacherRoom();
       if (!room) return;
       const { roomId, state } = room;
@@ -358,6 +370,7 @@ function setupSocketHandlers(io) {
     });
 
     socket.on('approveSecretTickets', () => {
+      if (isThrottled('approveSecretTickets', 1000)) return;
       const room = getTeacherRoom();
       if (!room) return;
       const { roomId, state } = room;
@@ -398,6 +411,7 @@ function setupSocketHandlers(io) {
     });
 
     socket.on('completeSale', () => {
+      if (isThrottled('completeSale', 1000)) return;
       const room = getTeacherRoom();
       if (!room) return;
       const { roomId, state } = room;
@@ -443,6 +457,7 @@ function setupSocketHandlers(io) {
     });
 
     socket.on('resolveTie', (winnerId) => {
+      if (isThrottled('resolveTie', 1000)) return;
       const room = getTeacherRoom();
       if (!room) return;
       const { roomId, state } = room;
@@ -528,12 +543,17 @@ function setupSocketHandlers(io) {
     });
 
     socket.on('addTeam', () => {
+      if (isThrottled('addTeam', 500)) return;
       const room = getTeacherRoom();
       if (!room) return;
       const { roomId, state } = room;
-      const nextIdNum = state.teams.length > 0
-        ? Math.max(...state.teams.map(t => parseInt(t.id.replace('team_', '')) || 0)) + 1
-        : 1;
+      // teamCounter 없는 구버전 Firebase 복원본 대비 fallback
+      if (!state.teamCounter) {
+        state.teamCounter = state.teams.length > 0
+          ? Math.max(...state.teams.map(t => parseInt(t.id.replace('team_', '')) || 0))
+          : 0;
+      }
+      const nextIdNum = ++state.teamCounter;
       const wonItemsTemplate = Object.fromEntries(state.categoryConfig.map(c => [c.id, null]));
       state.teams.push({
         id: `team_${nextIdNum}`,
@@ -576,6 +596,7 @@ function setupSocketHandlers(io) {
     });
 
     socket.on('submitBid', ({ amount, useSecretTicket }) => {
+      if (isThrottled('submitBid', 500)) return;
       const roomId = socket.data?.roomId;
       if (!roomId) return;
       const state = rooms.get(roomId);
@@ -634,6 +655,7 @@ function setupSocketHandlers(io) {
     });
 
     socket.on('submitGuess', ({ amount }) => {
+      if (isThrottled('submitGuess', 500)) return;
       const roomId = socket.data?.roomId;
       if (!roomId) return;
       const state = rooms.get(roomId);

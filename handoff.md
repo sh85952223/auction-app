@@ -1,91 +1,192 @@
-# UI/UX 리팩토링 Handoff
+# Auction App — 개발 Handoff 문서
+
+> 마지막 업데이트: 2026-04-26  
+> 대상 브랜치: `main` (origin보다 7 커밋 앞)
+
+---
 
 ## 프로젝트 개요
-`auction-app/` — React + Vite + Socket.IO 기반 교실 경매 수업 앱.  
-교사(재판장)가 경매를 진행하고 학생(모둠)이 실시간으로 입찰하는 구조.
 
----
-
-## 완료된 변경 사항
-
-### 1. Lobby.jsx — Role-Split Landing (최우선 완료)
-**파일**: `src/components/Lobby.jsx`  
-**변경 전**: 교사/학생 입장이 한 화면에 혼재. 학생은 이름 먼저 입력 후 팀 선택.  
-**변경 후**: 4단계 스텝 플로우 (`ROLE → TEACHER | TEAM_SELECT → TEAM_INFO`)
-- `ROLE`: 교사/학생 역할 선택 (두 큰 버튼)
-- `TEACHER`: 학년/반/PIN 입력 → 입장
-- `TEAM_SELECT`: 팀 그리드 먼저 표시 → 팀 클릭으로 선택
-- `TEAM_INFO`: 선택된 팀 확인 후 학년/반/이름 입력 → 입장
-- 뒤로가기(`ChevronLeft`) 버튼으로 각 단계 이동 가능
-- 접속중인 팀은 초록 펄스 표시 + disabled
-
-### 2. StudentView.jsx — 인터스티셜 제거 + 퀵버튼 입찰 UX
-**파일**: `src/components/StudentView.jsx`  
-**변경 전**: 경매 시작 → "참여할까요?" 팝업 2단계 → 금액 입력.  
-**변경 후**: 탭 스위처(경매 참여 | 입찰 포기 + 예측)를 한 화면에 통합
-- 기본값 `'BID'` 모드로 바로 금액 입력 화면 진입
-- 퀵버튼 `+50 / +100 / +200 / +500 / MAX` 로 빠른 금액 조절 (`adjustBid` 함수)
-- 탭 전환 시 에러 메시지 자동 초기화
-- `useEffect` 의존성: `gameState.auctionPhase` (BIDDING → BID 모드 리셋, REBIDDING → BID 모드 자동 세팅)
-- `participationMode` state 제거 → `mode: 'BID' | 'GUESS'`로 단순화
-
-### 3. TeacherView.jsx — 헤더 버튼 과부하 해소
-**파일**: `src/components/TeacherView.jsx`  
-**변경 전**: 헤더 1줄에 경매 진행 + 결과 리포트 + 모둠 관리 + 설정 + 초기화 + 로그아웃 혼재.  
-**변경 후**: 역할 분리
-- **진행 버튼** (경매 시작/마감/낙찰 확정/다음): 헤더에 크게 표시, 현재 phase에 맞는 것만 렌더링
-- **관리 도구** (결과 리포트, 모둠 관리, 경매 설정, 프로젝터 모드, 초기화, 로그아웃): `MoreVertical(⋮)` 버튼 드롭다운으로 이동
-  - `showMenu` state + `menuRef` + `useEffect` click-outside 감지로 구현
-  - `menuItemStyle` 상수를 파일 하단(`hexToRgb` 함수 위)에 정의
-
-### 4. StudentView.jsx — 대기실 피드백 (완료)
-**커밋**: `59a596b`  
-- `gameState.auctionPhase === 'WAITING'` 분기에 대기 카드 추가
-- 전체 팀 목록을 pill 형태로 표시, 접속 중인 팀은 초록 glow 인디케이터
-- 내 팀은 금색 강조 + "(나)" 레이블
-- `connectedTeams` prop을 App.jsx에서 StudentView로 추가 전달
-
-### 5. StudentView.jsx — 슬라이더 + useReducer 리팩터 (완료)
-**커밋**: `59a596b`  
-- BID 폼에 `<input type="range">` 슬라이더 추가 (max=bidLimits.maxBid, step=50)
-- 퀵버튼 `+50/+100/+200/+500/MAX` 위에 배치
-- 6개 독립 useState → `useReducer(formReducer)` 단일 상태로 통합
-  - actions: RESET / SET_BID_AMOUNT / SET_GUESS_AMOUNT / SET_MODE / SET_SECRET / SET_ERROR / SUBMITTED
-  - effect 내 단일 dispatch 호출로 `react-hooks/set-state-in-effect` 에러 해소
-
----
-
-## 남은 개선 과제
+`auction-app/` — React + Vite (프론트) + Node.js + Socket.IO (백엔드) + Firebase Firestore (영속성)  
+교사(재판장)가 경매를 진행하고 학생(모둠)이 실시간으로 밀봉 입찰하는 교실 수업용 앱.
 
 ---
 
 ## 핵심 파일 구조
+
 ```
-auction-app/src/
-├── App.jsx              — socket 연결, role/gameState 관리, session 복원
-├── components/
-│   ├── Lobby.jsx        — ★ 입장 플로우 (4단계 스텝)
-│   ├── StudentView.jsx  — ★ 학생 입찰 UI (탭 + 퀵버튼)
-│   ├── TeacherView.jsx  — ★ 교사 대시보드 (드롭다운 관리 메뉴)
-│   └── AuctionBoard.jsx — 경매 항목 그리드 (변경 없음)
-└── index.css            — 전역 스타일 (panel, btn-primary, sticky-bottom-bar 등)
+auction-app/
+├── server/
+│   ├── index.js          — Express + Socket.IO 서버 진입점, 환경변수 검증
+│   ├── gameLogic.js      — 핵심 게임 로직, 룸 관리, 소켓 이벤트 핸들러
+│   ├── firebase.js       — Firestore 초기화, 룸별 save/load
+│   └── .env.example      — 필수 환경변수 템플릿
+├── src/
+│   ├── App.jsx           — socket 연결, role/gameState 관리, 세션 복원
+│   └── components/
+│       ├── Lobby.jsx     — 입장 플로우 (5단계 스텝)
+│       ├── StudentView.jsx — 학생 입찰 UI (탭 + 퀵버튼 + 슬라이더)
+│       ├── TeacherView.jsx — 교사 대시보드 (드롭다운 관리 메뉴)
+│       └── AuctionBoard.jsx — 경매 항목 그리드
+└── ISSUES.md             — 보안/안정성 이슈 원문 (P0~P3 우선순위 분류)
 ```
 
-## Socket 이벤트 주요 목록
-| emit | 설명 |
-|------|------|
-| `joinAs` | 역할/팀 입장 |
-| `startAuctionFor` | 경매 시작 |
-| `submitBid` | 입찰 제출 |
-| `submitGuess` | 낙찰가 예측 제출 |
-| `revealBids` | 마감 및 결과 공개 |
-| `completeSale` | 낙찰 확정 |
-| `approveSecretTickets` | 해제권 허가 |
-| `resolveTie` | 동점 해소 |
-| `resetGame` | 전체 초기화 |
+---
+
+## 아키텍처 — 다중 룸(Multi-Room) 구조
+
+### 핵심 개념
+
+서버는 **`rooms: Map<roomId, GameState>`** 구조로 운영됨.
+
+- `roomId` = `"${grade}-${classNum}"` (예: `"3-2"`)
+- 교사가 학년/반으로 로그인 → 해당 roomId 룸 생성/입장
+- 학생이 학년/반 입력 후 `getTeamsForClass` 이벤트로 팀 목록 조회 → 팀 선택 후 해당 룸 입장
+- 모든 `io.emit` → `io.to(roomId).emit` 으로 룸 격리 브로드캐스트
+- 서버 재시작 시 Firebase `auction/{roomId}` 컬렉션에서 모든 룸 일괄 복원
+
+### 룸 입장 흐름
+
+```
+교사: joinAs(teacher, classInfo={grade,classNum}, pin)
+       → makeRoomId(classInfo) → getOrCreateRoom(roomId)
+       → socket.join(roomId)
+
+학생(Lobby): getTeamsForClass({grade,classNum})
+       → server: rooms.get(roomId)?.teams 반환
+       → 팀 선택 → joinAs(team, teamId, studentInfo={grade,classNum,members})
+       → makeRoomId(studentInfo) → getOrCreateRoom(roomId)
+       → socket.join(roomId)
+```
+
+### broadcastState 패턴
+
+```js
+io.to(roomId).emit('gameState', sanitizeState(state, false)); // 학생: bids/secretTicketRequests 마스킹
+io.to(teacherSocketId).emit('gameState', sanitizeState(state, true)); // 교사: 전체 공개
+```
+
+---
+
+## 완료된 UI/UX 개선 (이전 세션)
+
+### Lobby.jsx — 5단계 스텝 플로우
+`ROLE → TEACHER | TEAM_CLASS → TEAM_SELECT → TEAM_INFO`
+- 학생은 학년/반 먼저 입력(TEAM_CLASS) → 해당 반 팀 목록 서버에서 요청 → 팀 선택
+- 교사는 학년/반/PIN 입력
+
+### StudentView.jsx
+- 인터스티셜 제거 + 탭 스위처(경매 참여 | 입찰 포기+예측)
+- 퀵버튼 `+50/+100/+200/+500/MAX` + 슬라이더 입찰 UX
+- `useReducer(formReducer)` 단일 상태 관리
+
+### TeacherView.jsx
+- 진행 버튼(경매 시작/마감/낙찰 확정/다음)을 헤더에 크게 표시
+- 관리 도구를 `MoreVertical(⋮)` 드롭다운으로 이동
+
+---
+
+## 완료된 보안/안정성 수정 (ISSUES.md 기준)
+
+| 이슈 | 파일 | 커밋 요약 |
+|------|------|-----------|
+| **P0-1** resolveTie 권한 체크 | `gameLogic.js:384` | 이미 수정돼 있었음 |
+| **P0-2** BIDDING 중 bids 전체 노출 | `gameLogic.js` | `sanitizeState(forTeacher)` — BIDDING/REBIDDING 단계에서 학생에게 bids `{}` 마스킹 |
+| **P0-3** 재접속 후 재입찰 가능 | `gameLogic.js` | BIDDING 중 `bids[teamId] !== undefined`면 차단; 재접속 시 `bidAccepted(alreadySubmitted)` 재전송 |
+| **P1-1** 전역 단일 state | `gameLogic.js`, `firebase.js`, `Lobby.jsx`, `App.jsx` | `rooms Map` 기반 다중 룸 구조 전환 (이번 세션 최대 변경) |
+| **P1-2** 교사 재접속 시 입찰 현황 손실 | `gameLogic.js` | joinAs teacher 시 `teamBidStatus`, `bidsUpdated`, `initialBids` 재전송 |
+| **P1-3** Firebase 복원 시 stale connectedTeams | `gameLogic.js` | `connectedTeams: {}` 초기화 (이미 수정돼 있었음) |
+| **P1-4** CORS `"*"` | `server/index.js` | `process.env.ALLOWED_ORIGIN` 환경변수화 (이미 수정돼 있었음) |
+| **P1-5** 기본 PIN `'1234'` | `server/index.js` | `TEACHER_PIN` 없으면 서버 시작 차단 (이미 수정돼 있었음) |
+| **P2-1** bidsUpdated 전체 브로드캐스트 | `gameLogic.js` | 교사에게만 전송 (이미 수정돼 있었음) |
+| **P2-2** Firebase 과다 쓰기 | `gameLogic.js` | `scheduleSave` debounce 500ms (이미 수정돼 있었음) |
+| **P2-3** secretTicketRequests 클라이언트 노출 | `gameLogic.js` | `sanitizeState`에서 교사 외 마스킹 |
+| **P2-4** submitGuess 이중 제출 | `gameLogic.js` | `bids[teamId] !== undefined`면 차단 (이미 수정돼 있었음) |
+| **P3-1** Rate Limiting | `gameLogic.js` | per-socket `isThrottled()` — 학생 이벤트 500ms, 교사 이벤트 1000ms |
+| **P3-2** addTeam ID 충돌 잠재성 | `gameLogic.js` | `state.teamCounter` 단조증가 카운터로 ID 생성 |
+| **P3-3** Firebase initialBids 평문 저장 | `firebase.js` | `saveGameState`에서 `initialBids` 제외 |
+| **P3-4** .env.example 없음 | `server/.env.example` | 필수 환경변수 템플릿 신규 생성 |
+
+**모든 ISSUES.md 항목 완료.**
+
+---
+
+## Socket 이벤트 전체 목록
+
+### 클라이언트 → 서버
+
+| 이벤트 | 발신자 | 설명 |
+|--------|--------|------|
+| `joinAs` | 교사/학생 | 룸 입장. `{ role, teamId?, classInfo?, studentInfo?, pin? }` |
+| `getTeamsForClass` | 학생(Lobby) | 반별 팀 목록 요청. `{ grade, classNum }` |
+| `startAuctionFor` | 교사 | 특정 아이템 경매 시작. `itemId` |
+| `revealBids` | 교사 | 입찰 마감 및 공개 |
+| `approveSecretTickets` | 교사 | 해제권 허가 |
+| `completeSale` | 교사 | 낙찰 확정 |
+| `resolveTie` | 교사 | 동점 해소. `winnerId` |
+| `nextItem` | 교사 | 다음 아이템으로 이동 |
+| `resetGame` | 교사 | 게임 전체 초기화 |
+| `updateCategoryConfig` | 교사 | 경매 카테고리/항목 변경 |
+| `addTeam` / `removeTeam` | 교사 | 팀 추가/삭제 |
+| `resetTeamInfo` | 교사 | 특정 팀 학생 정보 초기화 |
+| `submitBid` | 학생 | 입찰 제출. `{ amount, useSecretTicket }` |
+| `submitGuess` | 학생 | 낙찰가 예측 제출. `{ amount }` |
+
+### 서버 → 클라이언트
+
+| 이벤트 | 수신자 | 설명 |
+|--------|--------|------|
+| `gameState` | 룸 전체 | 게임 상태 브로드캐스트 (교사/학생 내용 다름) |
+| `teamsForClass` | 요청 소켓 | 반별 팀 목록 응답 |
+| `connectedTeams` | 룸 전체 | 접속 중인 팀 ID 목록 |
+| `bidLimits` | 학생 개별 | 최대 입찰 금액 |
+| `teamBidStatus` | 교사 | 팀별 제출 여부/해제권 요청 여부 |
+| `bidsUpdated` | 교사 | 입찰 완료 팀 ID 목록 |
+| `ticketRequestsUpdated` | 교사 | 해제권 요청 현황 |
+| `initialBids` | 교사 + 해제권 팀 | REBIDDING 전환 시 1차 입찰가 |
+| `bidAccepted` | 학생 | 입찰 수락. `{ amount, alreadySubmitted? }` |
+| `bidRejected` | 학생 | 입찰 거부. `{ reason }` |
+| `authError` | 소켓 | 인증 오류 (로그아웃 처리) |
+
+---
+
+## Game Phase 상태 전이
+
+```
+WAITING
+  └─[startAuctionFor]→ BIDDING
+       └─[revealBids]→ REVEALING
+            ├─[completeSale, 단독 최고가]→ SOLD → [nextItem]→ WAITING
+            ├─[completeSale, 동점]→ TIE_BREAKER → [resolveTie]→ SOLD
+            └─[completeSale, 입찰 없음]→ NO_BIDS → [nextItem]→ WAITING
+       └─[approveSecretTickets]→ REBIDDING → [revealBids]→ REVEALING
+```
+
+---
+
+## 환경변수 (server/.env)
+
+```
+TEACHER_PIN=<필수, 미설정 시 서버 시작 불가>
+ALLOWED_ORIGIN=<프론트 도메인, 기본 http://localhost:5173>
+PORT=<기본 3001>
+FIREBASE_SERVICE_ACCOUNT=<JSON 문자열, 없으면 서비스 계정 파일 사용>
+```
+
+---
 
 ## 개발 서버 실행
+
 ```bash
-cd auction-app && npm run dev        # 프론트 (Vite, 기본 :5173)
-cd auction/server && node index.js   # 백엔드 (Express+Socket.IO, :3001)
+# 백엔드
+cd auction-app/server && node index.js
+
+# 프론트
+cd auction-app && npm run dev   # Vite :5173
 ```
+
+---
+
+## 미처리 항목 (없음)
+
+ISSUES.md의 P0~P3 항목 전체 완료. 추가 개선이 필요하다면 새 이슈를 ISSUES.md에 추가할 것.
