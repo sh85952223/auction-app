@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Gavel, Users, ChevronLeft } from 'lucide-react';
 
-// step: 'ROLE' | 'TEACHER' | 'TEAM_SELECT' | 'TEAM_INFO'
-export default function Lobby({ onJoin, connectedTeams, teams }) {
+// step: 'ROLE' | 'TEACHER' | 'TEAM_CLASS' | 'TEAM_SELECT' | 'TEAM_INFO'
+export default function Lobby({ onJoin, onRequestTeams, connectedTeams, teams, lobbyTeams }) {
   const [step, setStep] = useState('ROLE');
   const [selectedTeam, setSelectedTeam] = useState(null);
 
@@ -11,7 +11,11 @@ export default function Lobby({ onJoin, connectedTeams, teams }) {
   const [teacherGrade, setTeacherGrade] = useState('');
   const [teacherClassNum, setTeacherClassNum] = useState('');
 
-  // Student state
+  // Student class selection state (TEAM_CLASS step)
+  const [studentGrade, setStudentGrade] = useState('');
+  const [studentClassNum, setStudentClassNum] = useState('');
+
+  // Student info state (TEAM_INFO step) — pre-filled from TEAM_CLASS
   const [grade, setGrade] = useState('');
   const [classNum, setClassNum] = useState('');
   const [members, setMembers] = useState(['', '', '', '']);
@@ -26,6 +30,19 @@ export default function Lobby({ onJoin, connectedTeams, teams }) {
       return;
     }
     onJoin('teacher', null, { grade: teacherGrade, classNum: teacherClassNum }, teacherPin);
+  };
+
+  const handleClassSubmit = () => {
+    if (!studentGrade || !studentClassNum) {
+      alert('학년과 반을 입력하세요.');
+      return;
+    }
+    // 해당 반의 팀 목록을 서버에 요청
+    onRequestTeams({ grade: studentGrade, classNum: studentClassNum });
+    // TEAM_INFO에서 재입력 불필요하도록 미리 채워둠
+    setGrade(studentGrade);
+    setClassNum(studentClassNum);
+    setStep('TEAM_SELECT');
   };
 
   const handleMemberChange = (index, value) => {
@@ -47,6 +64,9 @@ export default function Lobby({ onJoin, connectedTeams, teams }) {
     }
     onJoin('team', selectedTeam.id, { grade, classNum, members: validMembers });
   };
+
+  // TEAM_SELECT에 표시할 팀 목록: 서버에서 받은 반별 팀 목록 우선, 없으면 전역 teams 사용
+  const displayTeams = lobbyTeams && lobbyTeams.length > 0 ? lobbyTeams : teams;
 
   return (
     <div className="flex flex-col items-center justify-center" style={{ minHeight: '80vh', padding: '1.5rem' }}>
@@ -72,7 +92,7 @@ export default function Lobby({ onJoin, connectedTeams, teams }) {
               </button>
               <button
                 className="btn-primary"
-                onClick={() => setStep('TEAM_SELECT')}
+                onClick={() => setStep('TEAM_CLASS')}
                 style={{ padding: '1.2rem', fontSize: '1.3rem', width: '100%', backgroundColor: '#1e3a5f', borderColor: '#60a5fa', color: '#f4ecd8' }}
               >
                 <Users size={22} /> 학생 (모둠)으로 입장
@@ -117,7 +137,7 @@ export default function Lobby({ onJoin, connectedTeams, teams }) {
             <input
               type="password"
               className="input-field"
-              placeholder="교사 비밀번호 (기본: 1234)"
+              placeholder="교사 비밀번호"
               value={teacherPin}
               onChange={(e) => setTeacherPin(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleTeacherJoin()}
@@ -129,24 +149,76 @@ export default function Lobby({ onJoin, connectedTeams, teams }) {
           </div>
         )}
 
-        {/* ── STEP 1b: 모둠 선택 ── */}
-        {step === 'TEAM_SELECT' && (
-          <div style={{ marginTop: '1.5rem' }}>
+        {/* ── STEP 1b: 학생 — 학년/반 선택 ── */}
+        {step === 'TEAM_CLASS' && (
+          <div style={{ marginTop: '1.5rem', textAlign: 'left' }}>
             <button
               onClick={() => setStep('ROLE')}
               style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.95rem' }}
             >
               <ChevronLeft size={16} /> 역할 선택으로
             </button>
-            <h3 className="gold-text" style={{ margin: '0 0 0.5rem 0' }}>우리 모둠을 선택하세요</h3>
+            <h3 className="gold-text" style={{ margin: '0 0 1.5rem 0', textAlign: 'center' }}>
+              우리 반 선택
+            </h3>
+            <p style={{ color: '#aaa', fontSize: '0.9rem', marginBottom: '1.2rem', textAlign: 'center' }}>
+              경매에 참여 중인 학년과 반을 입력하세요
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+              <input
+                type="number"
+                className="input-field"
+                placeholder="학년"
+                value={studentGrade}
+                onChange={(e) => setStudentGrade(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleClassSubmit()}
+                style={{ textAlign: 'center', flex: 1 }}
+                min="1" max="6"
+                autoFocus
+              />
+              <input
+                type="number"
+                className="input-field"
+                placeholder="반"
+                value={studentClassNum}
+                onChange={(e) => setStudentClassNum(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleClassSubmit()}
+                style={{ textAlign: 'center', flex: 1 }}
+                min="1" max="20"
+              />
+            </div>
+            <button
+              className="btn-primary"
+              onClick={handleClassSubmit}
+              style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', backgroundColor: '#1e3a5f', borderColor: '#60a5fa', color: '#f4ecd8' }}
+            >
+              모둠 목록 불러오기
+            </button>
+          </div>
+        )}
+
+        {/* ── STEP 2: 모둠 선택 ── */}
+        {step === 'TEAM_SELECT' && (
+          <div style={{ marginTop: '1.5rem' }}>
+            <button
+              onClick={() => setStep('TEAM_CLASS')}
+              style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.95rem' }}
+            >
+              <ChevronLeft size={16} /> 반 선택으로
+            </button>
+            <h3 className="gold-text" style={{ margin: '0 0 0.5rem 0' }}>
+              {studentGrade}학년 {studentClassNum}반 — 우리 모둠을 선택하세요
+            </h3>
             <p style={{ color: '#aaa', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
               ※ 모둠별로 대표 기기 1대만 접속해야 합니다
             </p>
-            {teams.length === 0 ? (
-              <p style={{ color: '#888', padding: '2rem' }}>교사가 경매를 설정 중입니다. 잠시 대기해 주세요.</p>
+            {displayTeams.length === 0 ? (
+              <p style={{ color: '#888', padding: '2rem' }}>
+                교사가 아직 경매를 시작하지 않았거나 해당 반이 없습니다. 잠시 대기해 주세요.
+              </p>
             ) : (
               <div className="items-grid">
-                {teams.map((team) => {
+                {displayTeams.map((team) => {
                   const isConnected = connectedTeams && connectedTeams.includes(team.id);
                   return (
                     <button
@@ -174,7 +246,7 @@ export default function Lobby({ onJoin, connectedTeams, teams }) {
           </div>
         )}
 
-        {/* ── STEP 2: 모둠원 정보 입력 ── */}
+        {/* ── STEP 3: 모둠원 정보 입력 ── */}
         {step === 'TEAM_INFO' && selectedTeam && (
           <div style={{ marginTop: '1.5rem', textAlign: 'left' }}>
             <button

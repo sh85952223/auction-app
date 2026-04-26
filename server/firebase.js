@@ -32,18 +32,43 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   console.warn('⚠️ serviceAccountKey.json not found in server directory. Running without Firebase integration.');
 }
 
-// Helper to save auction state
-async function saveGameState(state) {
+// roomId별로 상태 저장 (initialBids는 민감 데이터이므로 저장 제외)
+async function saveGameState(state, roomId = 'currentState') {
   if (!db) return;
   try {
-    // Save full state for recovery (sanitization happens on broadcast)
-    await db.collection('auction').doc('currentState').set(state);
+    const { initialBids, ...stateToSave } = state;
+    await db.collection('auction').doc(roomId).set(stateToSave);
   } catch (err) {
     console.error('Error saving state to Firebase:', err);
   }
 }
 
-// Helper to log auction events (like successful bids, etc.)
+// roomId별로 상태 로드
+async function loadGameState(roomId = 'currentState') {
+  if (!db) return null;
+  try {
+    const doc = await db.collection('auction').doc(roomId).get();
+    if (doc.exists) return doc.data();
+  } catch (err) {
+    console.error('Error loading state from Firebase:', err);
+  }
+  return null;
+}
+
+// 서버 시작 시 모든 룸 상태 복원
+async function loadAllRooms() {
+  if (!db) return {};
+  try {
+    const snapshot = await db.collection('auction').get();
+    const result = {};
+    snapshot.forEach(doc => { result[doc.id] = doc.data(); });
+    return result;
+  } catch (err) {
+    console.error('Error loading all rooms from Firebase:', err);
+    return {};
+  }
+}
+
 async function logAuctionEvent(eventData) {
   if (!db) return;
   try {
@@ -56,22 +81,10 @@ async function logAuctionEvent(eventData) {
   }
 }
 
-async function loadGameState() {
-  if (!db) return null;
-  try {
-    const doc = await db.collection('auction').doc('currentState').get();
-    if (doc.exists) {
-      return doc.data();
-    }
-  } catch (err) {
-    console.error('Error loading state from Firebase:', err);
-  }
-  return null;
-}
-
 module.exports = {
   db,
   saveGameState,
   loadGameState,
+  loadAllRooms,
   logAuctionEvent
 };

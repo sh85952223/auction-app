@@ -15,6 +15,11 @@ function App() {
   const [bidLimits, setBidLimits] = useState({ maxBid: 0 });
   const [teamBidStatus, setTeamBidStatus] = useState({});
   const [connectedTeams, setConnectedTeams] = useState([]);
+  const [lobbyTeams, setLobbyTeams] = useState([]);
+
+  const handleRequestTeams = (classInfo) => {
+    socket.emit('getTeamsForClass', classInfo);
+  };
 
   const handleJoin = (selectedRole, selectedTeamId = null, extraInfo = null, pin = null) => {
     if (selectedRole === 'teacher') {
@@ -115,6 +120,10 @@ function App() {
       });
     });
 
+    socket.on('teamsForClass', (teams) => {
+      setLobbyTeams(teams);
+    });
+
     socket.on('authError', (msg) => {
       alert(msg);
       handleLogout();
@@ -129,12 +138,13 @@ function App() {
       socket.off('bidsUpdated');
       socket.off('ticketRequestsUpdated');
       socket.off('initialBids');
+      socket.off('teamsForClass');
       socket.off('authError');
     };
   }, []); // socket listeners are set up once on mount
 
   if (!role) {
-    return <Lobby onJoin={handleJoin} connectedTeams={connectedTeams} teams={gameState?.teams || []} />;
+    return <Lobby onJoin={handleJoin} connectedTeams={connectedTeams} teams={gameState?.teams || []} onRequestTeams={handleRequestTeams} lobbyTeams={lobbyTeams} />;
   }
 
   if (!gameState) {

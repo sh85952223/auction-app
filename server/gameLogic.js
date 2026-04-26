@@ -1,5 +1,5 @@
 const initialBudget = 1000;
-const { saveGameState, loadGameState } = require('./firebase');
+const { saveGameState, loadAllRooms } = require('./firebase');
 
 const defaultCategoryConfig = [
   {
@@ -92,36 +92,48 @@ function createInitialState(categoryConfig = defaultCategoryConfig) {
   };
 }
 
-let state = createInitialState();
+// ── 룸 관리 ──
+const rooms = new Map(); // roomId → state
+const _saveTimers = new Map(); // roomId → timer
 
-function awardGuessers(winningAmount) {
+function makeRoomId(classInfo) {
+  if (!classInfo?.grade || !classInfo?.classNum) return null;
+  return `${classInfo.grade}-${classInfo.classNum}`;
+}
+
+function getOrCreateRoom(roomId) {
+  if (!rooms.has(roomId)) rooms.set(roomId, createInitialState());
+  return rooms.get(roomId);
+}
+
+// ── 상태 헬퍼 (state를 첫 번째 인수로 전달) ──
+
+function awardGuessers(state, winningAmount) {
   if (!state.guesses || Object.keys(state.guesses).length === 0) return;
 
   let minDiff = Infinity;
   let closestTeams = [];
 
   Object.entries(state.guesses).forEach(([teamId, guess]) => {
-     const diff = Math.abs(guess - winningAmount);
-     if (diff < minDiff) {
-        minDiff = diff;
-        closestTeams = [teamId];
-     } else if (diff === minDiff) {
-        closestTeams.push(teamId);
-     }
+    const diff = Math.abs(guess - winningAmount);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closestTeams = [teamId];
+    } else if (diff === minDiff) {
+      closestTeams.push(teamId);
+    }
   });
 
   closestTeams.forEach(teamId => {
-     const team = state.teams.find(t => t.id === teamId);
-     if (team) {
-        team.budget += 100;
-     }
+    const team = state.teams.find(t => t.id === teamId);
+    if (team) team.budget += 100;
   });
 
   state.lastGuessWinners = {
-     winningAmount,
-     teams: closestTeams,
-     minDiff,
-     bonus: 100
+    winningAmount,
+    teams: closestTeams,
+    minDiff,
+    bonus: 100
   };
 }
 
@@ -129,13 +141,11 @@ function getRemainingCategoriesNeeded(team) {
   return Object.keys(team.wonItems).filter(k => !team.wonItems[k]).length;
 }
 
-function calculateMaxBid(teamId, currentItemCategory) {
+function calculateMaxBid(state, teamId, currentItemCategory) {
   const team = state.teams.find(t => t.id === teamId);
   if (!team) return 0;
 
-  if (team.wonItems[currentItemCategory]) {
-    return 0;
-  }
+  if (team.wonItems[currentItemCategory]) return 0;
 
   const needed = getRemainingCategoriesNeeded(team);
   const otherCategoriesNeeded = needed - 1;
@@ -144,7 +154,7 @@ function calculateMaxBid(teamId, currentItemCategory) {
   return maxBid > 0 ? Math.floor(maxBid / 50) * 50 : 0;
 }
 
-function sanitizeState(forTeacher = false) {
+function sanitizeState(state, forTeacher = false) {
   const { initialBids, ...safeState } = state;
   const revealPhases = ['REVEALING', 'TIE_BREAKER', 'SOLD', 'NO_BIDS'];
   const showBids = forTeacher || revealPhases.includes(state.auctionPhase);
@@ -155,73 +165,72 @@ function sanitizeState(forTeacher = false) {
   };
 }
 
-let _saveTimer = null;
-function scheduleSave() {
-  if (_saveTimer) clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(() => saveGameState(state), 500);
+function scheduleRoomSave(roomId) {
+  if (_saveTimers.has(roomId)) clearTimeout(_saveTimers.get(roomId));
+  _saveTimers.set(roomId, setTimeout(() => {
+    const s = rooms.get(roomId);
+    if (s) saveGameState(s, roomId);
+  }, 500));
 }
 
-function broadcastState(io) {
-  io.emit('gameState', sanitizeState(false));
+function broadcastState(io, roomId) {
+  const state = rooms.get(roomId);
+  if (!state) return;
+  io.to(roomId).emit('gameState', sanitizeState(state, false));
   if (state.teacherSocketId) {
-    io.to(state.teacherSocketId).emit('gameState', sanitizeState(true));
+    io.to(state.teacherSocketId).emit('gameState', sanitizeState(state, true));
   }
-  scheduleSave();
+  scheduleRoomSave(roomId);
 }
 
 function setupSocketHandlers(io) {
+  // 서버 시작 시 Firebase에서 모든 룸 복원
   (async () => {
-    const savedState = await loadGameState();
-    if (savedState) {
-       state = {
-         ...state,
-         ...savedState,
-         connectedTeams: {}, // 재시작 후 이전 socket ID는 유효하지 않으므로 초기화
-         teacherSocketId: null,
-       };
-       if (!state.categoryConfig) {
-         state.categoryConfig = defaultCategoryConfig;
-       }
-       console.log('Auction state restored from Firebase.');
-       broadcastState(io);
+    try {
+      const allRooms = await loadAllRooms();
+      for (const [roomId, savedState] of Object.entries(allRooms)) {
+        const state = getOrCreateRoom(roomId);
+        Object.assign(state, savedState, { connectedTeams: {}, teacherSocketId: null });
+        if (!state.categoryConfig) state.categoryConfig = defaultCategoryConfig;
+      }
+      const count = Object.keys(allRooms).length;
+      if (count > 0) console.log(`Restored ${count} room(s) from Firebase.`);
+    } catch (err) {
+      console.error('Firebase restore failed:', err);
     }
   })();
 
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
-    socket.emit('gameState', sanitizeState(false));
+    // 학생이 팀 목록 요청 시 해당 반의 팀 목록 반환
+    socket.on('getTeamsForClass', ({ grade, classNum }) => {
+      const roomId = makeRoomId({ grade, classNum });
+      const state = roomId ? rooms.get(roomId) : null;
+      socket.emit('teamsForClass', state ? state.teams : []);
+    });
 
     socket.on('joinAs', ({ role, teamId, studentInfo, classInfo, pin }) => {
       if (role === 'teacher') {
-        const correctPin = process.env.TEACHER_PIN;
-        if (pin !== correctPin) {
-           socket.emit('authError', '비밀번호가 올바르지 않습니다.');
-           return;
+        if (pin !== process.env.TEACHER_PIN) {
+          socket.emit('authError', '비밀번호가 올바르지 않습니다.');
+          return;
         }
 
-        const isNewClass = classInfo && state.classInfo && (
-          String(state.classInfo.grade) !== String(classInfo.grade) ||
-          String(state.classInfo.classNum) !== String(classInfo.classNum)
-        );
-
-        if (isNewClass) {
-           const savedConnectedTeams = { ...state.connectedTeams };
-           const savedCategoryConfig = state.categoryConfig;
-           state = createInitialState(savedCategoryConfig);
-           state.classInfo = classInfo;
-           state.connectedTeams = savedConnectedTeams;
-           Object.values(savedConnectedTeams).forEach(tId => {
-             const team = state.teams.find(t => t.id === tId);
-             if (team) team.studentInfo = null;
-           });
-        } else if (classInfo) {
-           state.classInfo = classInfo;
+        const roomId = makeRoomId(classInfo);
+        if (!roomId) {
+          socket.emit('authError', '학년과 반 정보를 입력해주세요.');
+          return;
         }
 
+        const state = getOrCreateRoom(roomId);
+        if (classInfo) state.classInfo = classInfo;
         state.teacherSocketId = socket.id;
-        console.log(`Teacher connected for class ${state.classInfo ? state.classInfo.grade + '-' + state.classInfo.classNum : 'unknown'}`);
-        socket.emit('gameState', sanitizeState(true));
+        socket.data.roomId = roomId;
+        socket.join(roomId);
+
+        console.log(`Teacher connected to room ${roomId}`);
+        socket.emit('gameState', sanitizeState(state, true));
         socket.emit('connectedTeams', Object.values(state.connectedTeams));
 
         // 재접속 시 진행 중인 입찰 현황 재전송
@@ -239,19 +248,27 @@ function setupSocketHandlers(io) {
             }
           });
           socket.emit('bidsUpdated', [...new Set([...Object.keys(state.bids), ...Object.keys(state.guesses)])]);
-          if (state.auctionPhase === 'REBIDDING') {
-            socket.emit('initialBids', state.initialBids);
-          }
+          if (state.auctionPhase === 'REBIDDING') socket.emit('initialBids', state.initialBids);
         }
+
       } else if (role === 'team' && teamId) {
+        const roomId = makeRoomId(studentInfo ? { grade: studentInfo.grade, classNum: studentInfo.classNum } : null);
+        if (!roomId) {
+          socket.emit('authError', '학년과 반 정보가 필요합니다.');
+          return;
+        }
+
+        const state = getOrCreateRoom(roomId);
         const targetTeam = state.teams.find(t => t.id === teamId);
         if (!targetTeam) return;
 
         if (targetTeam.studentInfo && studentInfo) {
-           if (targetTeam.studentInfo.grade !== studentInfo.grade || targetTeam.studentInfo.classNum !== studentInfo.classNum || targetTeam.studentInfo.members !== studentInfo.members) {
-              socket.emit('authError', '이미 해당 모둠에 다른 학생 정보가 등록되어 있습니다. 잘못 등록된 경우 재판장(교사)에게 [정보 초기화]를 요청하세요.');
-              return;
-           }
+          if (targetTeam.studentInfo.grade !== studentInfo.grade ||
+              targetTeam.studentInfo.classNum !== studentInfo.classNum ||
+              targetTeam.studentInfo.members !== studentInfo.members) {
+            socket.emit('authError', '이미 해당 모둠에 다른 학생 정보가 등록되어 있습니다. 잘못 등록된 경우 재판장(교사)에게 [정보 초기화]를 요청하세요.');
+            return;
+          }
         }
 
         const existingSockId = Object.keys(state.connectedTeams).find(sid => state.connectedTeams[sid] === teamId);
@@ -261,21 +278,18 @@ function setupSocketHandlers(io) {
         }
 
         state.connectedTeams[socket.id] = teamId;
-        if (studentInfo) {
-          targetTeam.studentInfo = studentInfo;
-        }
-        console.log(`Team ${teamId} (${studentInfo ? studentInfo.members : 'Unknown'}) connected`);
+        if (studentInfo) targetTeam.studentInfo = studentInfo;
+        socket.data.roomId = roomId;
+        socket.join(roomId);
 
-        const connectedKeys = Object.values(state.connectedTeams);
-        io.emit('connectedTeams', connectedKeys);
+        console.log(`Team ${teamId} (${studentInfo?.members || 'Unknown'}) joined room ${roomId}`);
 
-        broadcastState(io);
+        io.to(roomId).emit('connectedTeams', Object.values(state.connectedTeams));
+        broadcastState(io, roomId);
 
         if (state.currentAuctionItemId) {
           const item = state.items.find(i => i.id === state.currentAuctionItemId);
-          if (item) {
-             socket.emit('bidLimits', { maxBid: calculateMaxBid(teamId, item.category) });
-          }
+          if (item) socket.emit('bidLimits', { maxBid: calculateMaxBid(state, teamId, item.category) });
         }
 
         // 재접속 시 이미 입찰한 상태면 알림
@@ -286,19 +300,32 @@ function setupSocketHandlers(io) {
     });
 
     socket.on('disconnect', () => {
-      if (socket.id === state.teacherSocketId) {
-        state.teacherSocketId = null;
-      }
+      const roomId = socket.data?.roomId;
+      if (!roomId) { console.log('Client disconnected (no room):', socket.id); return; }
+      const state = rooms.get(roomId);
+      if (!state) { console.log('Client disconnected:', socket.id); return; }
+
+      if (socket.id === state.teacherSocketId) state.teacherSocketId = null;
       if (state.connectedTeams[socket.id]) {
         delete state.connectedTeams[socket.id];
-        const connectedKeys = Object.values(state.connectedTeams);
-        io.emit('connectedTeams', connectedKeys);
+        io.to(roomId).emit('connectedTeams', Object.values(state.connectedTeams));
       }
-      console.log('Client disconnected:', socket.id);
+      console.log(`Client disconnected from room ${roomId}:`, socket.id);
     });
 
+    // 교사 전용 이벤트에서 룸과 권한을 한 번에 검증하는 헬퍼
+    const getTeacherRoom = () => {
+      const roomId = socket.data?.roomId;
+      if (!roomId) return null;
+      const state = rooms.get(roomId);
+      if (!state || socket.id !== state.teacherSocketId) return null;
+      return { roomId, state };
+    };
+
     socket.on('startAuctionFor', (itemId) => {
-      if (socket.id !== state.teacherSocketId) return;
+      const room = getTeacherRoom();
+      if (!room) return;
+      const { roomId, state } = room;
 
       const item = state.items.find(i => i.id === itemId);
       if (!item || item.isSold) return;
@@ -312,24 +339,28 @@ function setupSocketHandlers(io) {
       state.guesses = {};
       state.lastGuessWinners = null;
 
-      broadcastState(io);
+      broadcastState(io, roomId);
 
       Object.keys(state.connectedTeams).forEach(sockId => {
         const tId = state.connectedTeams[sockId];
-        io.to(sockId).emit('bidLimits', { maxBid: calculateMaxBid(tId, item.category) });
+        io.to(sockId).emit('bidLimits', { maxBid: calculateMaxBid(state, tId, item.category) });
       });
     });
 
     socket.on('revealBids', () => {
-      if (socket.id !== state.teacherSocketId) return;
+      const room = getTeacherRoom();
+      if (!room) return;
+      const { roomId, state } = room;
       if (state.auctionPhase !== 'BIDDING' && state.auctionPhase !== 'REBIDDING') return;
 
       state.auctionPhase = 'REVEALING';
-      broadcastState(io);
+      broadcastState(io, roomId);
     });
 
     socket.on('approveSecretTickets', () => {
-      if (socket.id !== state.teacherSocketId) return;
+      const room = getTeacherRoom();
+      if (!room) return;
+      const { roomId, state } = room;
       if (state.auctionPhase !== 'BIDDING') return;
 
       const requestingTeams = Object.keys(state.secretTicketRequests).filter(tId => state.secretTicketRequests[tId]);
@@ -338,8 +369,8 @@ function setupSocketHandlers(io) {
       requestingTeams.forEach(tId => {
         const team = state.teams.find(t => t.id === tId);
         if (team) {
-           team.budget -= 100;
-           team.hasSecretTicket = false;
+          team.budget -= 100;
+          team.hasSecretTicket = false;
         }
       });
 
@@ -349,13 +380,11 @@ function setupSocketHandlers(io) {
       state.secretTicketRequests = {};
       state.auctionPhase = 'REBIDDING';
 
-      broadcastState(io);
+      broadcastState(io, roomId);
 
       state.secretTicketApprovedTeams.forEach(tId => {
         const sockIds = Object.keys(state.connectedTeams).filter(sid => state.connectedTeams[sid] === tId);
-        sockIds.forEach(sid => {
-          io.to(sid).emit('initialBids', state.initialBids);
-        });
+        sockIds.forEach(sid => io.to(sid).emit('initialBids', state.initialBids));
       });
       if (state.teacherSocketId) {
         io.to(state.teacherSocketId).emit('initialBids', state.initialBids);
@@ -364,14 +393,14 @@ function setupSocketHandlers(io) {
       Object.keys(state.connectedTeams).forEach(sockId => {
         const tId = state.connectedTeams[sockId];
         const item = state.items.find(i => i.id === state.currentAuctionItemId);
-        if (item) {
-           io.to(sockId).emit('bidLimits', { maxBid: calculateMaxBid(tId, item.category) });
-        }
+        if (item) io.to(sockId).emit('bidLimits', { maxBid: calculateMaxBid(state, tId, item.category) });
       });
     });
 
     socket.on('completeSale', () => {
-      if (socket.id !== state.teacherSocketId) return;
+      const room = getTeacherRoom();
+      if (!room) return;
+      const { roomId, state } = room;
       if (state.auctionPhase !== 'REVEALING') return;
 
       let highestBid = -1;
@@ -379,56 +408,57 @@ function setupSocketHandlers(io) {
       const item = state.items.find(i => i.id === state.currentAuctionItemId);
 
       Object.entries(state.bids).forEach(([teamId, bid]) => {
-          if (bid > highestBid) {
-              highestBid = bid;
-              winners = [teamId];
-          } else if (bid === highestBid && bid > 0) {
-              winners.push(teamId);
-          }
+        if (bid > highestBid) {
+          highestBid = bid;
+          winners = [teamId];
+        } else if (bid === highestBid && bid > 0) {
+          winners.push(teamId);
+        }
       });
 
       if (winners.length === 1 && highestBid > 0) {
-          const winnerId = winners[0];
-          item.winner = winnerId;
-          item.winningBid = highestBid;
-          item.isSold = true;
+        const winnerId = winners[0];
+        item.winner = winnerId;
+        item.winningBid = highestBid;
+        item.isSold = true;
 
-          const team = state.teams.find(t => t.id === winnerId);
-          if (team) {
-              team.budget -= highestBid;
-              team.wonItems[item.category] = item.id;
-          }
-          state.auctionPhase = 'SOLD';
-          awardGuessers(highestBid);
-          broadcastState(io);
+        const team = state.teams.find(t => t.id === winnerId);
+        if (team) {
+          team.budget -= highestBid;
+          team.wonItems[item.category] = item.id;
+        }
+        state.auctionPhase = 'SOLD';
+        awardGuessers(state, highestBid);
+        broadcastState(io, roomId);
       } else if (winners.length > 1 && highestBid > 0) {
-          state.auctionPhase = 'TIE_BREAKER';
-          state.tiedTeams = winners;
-          state.highestTieBid = highestBid;
-          broadcastState(io);
+        state.auctionPhase = 'TIE_BREAKER';
+        state.tiedTeams = winners;
+        state.highestTieBid = highestBid;
+        broadcastState(io, roomId);
       } else {
         state.auctionPhase = 'NO_BIDS';
-        let winningAmountForGuess = highestBid > 0 ? highestBid : 0;
-        awardGuessers(winningAmountForGuess);
-        broadcastState(io);
+        awardGuessers(state, highestBid > 0 ? highestBid : 0);
+        broadcastState(io, roomId);
       }
     });
 
     socket.on('resolveTie', (winnerId) => {
-      if (socket.id !== state.teacherSocketId) return;
+      const room = getTeacherRoom();
+      if (!room) return;
+      const { roomId, state } = room;
       if (state.auctionPhase !== 'TIE_BREAKER') return;
 
       const item = state.items.find(i => i.id === state.currentAuctionItemId);
       if (item && state.tiedTeams.includes(winnerId)) {
-          item.winner = winnerId;
-          item.winningBid = state.highestTieBid;
-          item.isSold = true;
+        item.winner = winnerId;
+        item.winningBid = state.highestTieBid;
+        item.isSold = true;
 
-          const team = state.teams.find(t => t.id === winnerId);
-          if (team) {
-              team.budget -= state.highestTieBid;
-              team.wonItems[item.category] = item.id;
-          }
+        const team = state.teams.find(t => t.id === winnerId);
+        if (team) {
+          team.budget -= state.highestTieBid;
+          team.wonItems[item.category] = item.id;
+        }
       }
 
       state.auctionPhase = 'SOLD';
@@ -436,46 +466,46 @@ function setupSocketHandlers(io) {
       state.highestTieBid = null;
 
       const itemAfterTie = state.items.find(i => i.id === state.currentAuctionItemId);
-      if (itemAfterTie) {
-          awardGuessers(itemAfterTie.winningBid);
-      }
+      if (itemAfterTie) awardGuessers(state, itemAfterTie.winningBid);
 
-      broadcastState(io);
+      broadcastState(io, roomId);
     });
 
     socket.on('nextItem', () => {
-        if (socket.id !== state.teacherSocketId) return;
-        state.currentAuctionItemId = null;
-        state.auctionPhase = 'WAITING';
-        state.lastGuessWinners = null;
-        broadcastState(io);
+      const room = getTeacherRoom();
+      if (!room) return;
+      const { roomId, state } = room;
+      state.currentAuctionItemId = null;
+      state.auctionPhase = 'WAITING';
+      state.lastGuessWinners = null;
+      broadcastState(io, roomId);
     });
 
     socket.on('resetGame', () => {
-        if (socket.id !== state.teacherSocketId) return;
-        const savedTeacherSocket = state.teacherSocketId;
-        const savedConnectedTeams = { ...state.connectedTeams };
-        const savedClassInfo = state.classInfo;
-        const savedCategoryConfig = state.categoryConfig;
+      const room = getTeacherRoom();
+      if (!room) return;
+      const { roomId, state } = room;
 
-        state = createInitialState(savedCategoryConfig);
-        state.teacherSocketId = savedTeacherSocket;
-        state.connectedTeams = savedConnectedTeams;
-        state.classInfo = savedClassInfo;
+      const newState = createInitialState(state.categoryConfig);
+      newState.teacherSocketId = state.teacherSocketId;
+      newState.connectedTeams = { ...state.connectedTeams };
+      newState.classInfo = state.classInfo;
+      Object.values(state.connectedTeams).forEach(tId => {
+        const team = newState.teams.find(t => t.id === tId);
+        if (team) team.studentInfo = null;
+      });
+      rooms.set(roomId, newState);
 
-        Object.values(savedConnectedTeams).forEach(tId => {
-          const team = state.teams.find(t => t.id === tId);
-          if (team) team.studentInfo = null;
-        });
-        broadcastState(io);
-        console.log('Game reset by teacher');
+      broadcastState(io, roomId);
+      console.log(`Game reset by teacher in room ${roomId}`);
     });
 
     socket.on('updateCategoryConfig', (newConfig) => {
-      if (socket.id !== state.teacherSocketId) return;
+      const room = getTeacherRoom();
+      if (!room) return;
+      const { roomId, state } = room;
       if (!Array.isArray(newConfig) || newConfig.length === 0) return;
 
-      // Validate each category has id, name, and at least one item
       const isValid = newConfig.every(cat =>
         cat.id && typeof cat.id === 'string' &&
         cat.name && typeof cat.name === 'string' &&
@@ -483,71 +513,78 @@ function setupSocketHandlers(io) {
       );
       if (!isValid) return;
 
-      const savedTeacherSocket = state.teacherSocketId;
-      const savedConnectedTeams = { ...state.connectedTeams };
-      const savedClassInfo = state.classInfo;
-
-      state = createInitialState(newConfig);
-      state.teacherSocketId = savedTeacherSocket;
-      state.connectedTeams = savedConnectedTeams;
-      state.classInfo = savedClassInfo;
-
-      Object.values(savedConnectedTeams).forEach(tId => {
-        const team = state.teams.find(t => t.id === tId);
+      const newState = createInitialState(newConfig);
+      newState.teacherSocketId = state.teacherSocketId;
+      newState.connectedTeams = { ...state.connectedTeams };
+      newState.classInfo = state.classInfo;
+      Object.values(state.connectedTeams).forEach(tId => {
+        const team = newState.teams.find(t => t.id === tId);
         if (team) team.studentInfo = null;
       });
+      rooms.set(roomId, newState);
 
-      broadcastState(io);
-      console.log('Category config updated by teacher');
+      broadcastState(io, roomId);
+      console.log(`Category config updated by teacher in room ${roomId}`);
     });
 
     socket.on('addTeam', () => {
-      if (socket.id !== state.teacherSocketId) return;
-      const nextIdNum = state.teams.length > 0 ? Math.max(...state.teams.map(t => parseInt(t.id.replace('team_', '')) || 0)) + 1 : 1;
+      const room = getTeacherRoom();
+      if (!room) return;
+      const { roomId, state } = room;
+      const nextIdNum = state.teams.length > 0
+        ? Math.max(...state.teams.map(t => parseInt(t.id.replace('team_', '')) || 0)) + 1
+        : 1;
       const wonItemsTemplate = Object.fromEntries(state.categoryConfig.map(c => [c.id, null]));
-      const newTeam = {
+      state.teams.push({
         id: `team_${nextIdNum}`,
         name: `${nextIdNum}모둠`,
         budget: initialBudget,
         hasSecretTicket: true,
         studentInfo: null,
         wonItems: { ...wonItemsTemplate }
-      };
-      state.teams.push(newTeam);
-      broadcastState(io);
+      });
+      broadcastState(io, roomId);
     });
 
     socket.on('removeTeam', (targetTeamId) => {
-      if (socket.id !== state.teacherSocketId) return;
+      const room = getTeacherRoom();
+      if (!room) return;
+      const { roomId, state } = room;
       state.teams = state.teams.filter(t => t.id !== targetTeamId);
       const targetSocketId = Object.keys(state.connectedTeams).find(sid => state.connectedTeams[sid] === targetTeamId);
       if (targetSocketId) {
-         io.to(targetSocketId).emit('authError', '재판장에 의해 모둠이 삭제되었습니다.');
-         delete state.connectedTeams[targetSocketId];
+        io.to(targetSocketId).emit('authError', '재판장에 의해 모둠이 삭제되었습니다.');
+        delete state.connectedTeams[targetSocketId];
       }
-      broadcastState(io);
+      broadcastState(io, roomId);
     });
 
     socket.on('resetTeamInfo', (targetTeamId) => {
-      if (socket.id !== state.teacherSocketId) return;
+      const room = getTeacherRoom();
+      if (!room) return;
+      const { roomId, state } = room;
       const team = state.teams.find(t => t.id === targetTeamId);
       if (team) {
-         team.studentInfo = null;
-         const targetSocketId = Object.keys(state.connectedTeams).find(sid => state.connectedTeams[sid] === targetTeamId);
-         if (targetSocketId) {
-           io.to(targetSocketId).emit('authError', '재판장에 의해 등록 정보가 초기화되었습니다. 올바른 정보로 다시 입장해주세요.');
-           delete state.connectedTeams[targetSocketId];
-         }
+        team.studentInfo = null;
+        const targetSocketId = Object.keys(state.connectedTeams).find(sid => state.connectedTeams[sid] === targetTeamId);
+        if (targetSocketId) {
+          io.to(targetSocketId).emit('authError', '재판장에 의해 등록 정보가 초기화되었습니다. 올바른 정보로 다시 입장해주세요.');
+          delete state.connectedTeams[targetSocketId];
+        }
       }
-      broadcastState(io);
+      broadcastState(io, roomId);
     });
 
     socket.on('submitBid', ({ amount, useSecretTicket }) => {
+      const roomId = socket.data?.roomId;
+      if (!roomId) return;
+      const state = rooms.get(roomId);
+      if (!state) return;
       const teamId = state.connectedTeams[socket.id];
       if (!teamId) return;
       if (state.auctionPhase !== 'BIDDING' && state.auctionPhase !== 'REBIDDING') return;
 
-      // BIDDING 단계에서는 이미 제출한 팀의 재입찰 차단 (재접속 후 변경 방지)
+      // BIDDING 단계에서는 이미 제출한 팀의 재입찰 차단
       if (state.auctionPhase === 'BIDDING' && state.bids[teamId] !== undefined) {
         socket.emit('bidRejected', { reason: '이미 입찰하셨습니다.' });
         return;
@@ -557,12 +594,10 @@ function setupSocketHandlers(io) {
       if (!item) return;
 
       const team = state.teams.find(t => t.id === teamId);
-      const maxBid = calculateMaxBid(teamId, item.category);
+      const maxBid = calculateMaxBid(state, teamId, item.category);
 
       let validBid = Math.max(0, parseInt(amount, 10) || 0);
-      if (validBid % 50 !== 0) {
-        validBid = Math.floor(validBid / 50) * 50;
-      }
+      if (validBid % 50 !== 0) validBid = Math.floor(validBid / 50) * 50;
       if (validBid <= 0) {
         socket.emit('bidRejected', { reason: '최소 입찰 금액은 50 코인입니다.' });
         return;
@@ -570,31 +605,28 @@ function setupSocketHandlers(io) {
 
       let applyTicket = false;
       if (state.auctionPhase === 'BIDDING' && useSecretTicket && team.hasSecretTicket) {
-         if (validBid + 100 <= maxBid) {
-            applyTicket = true;
-         } else {
-            validBid = Math.max(0, Math.floor((maxBid - 100) / 50) * 50);
-            applyTicket = true;
-         }
+        if (validBid + 100 <= maxBid) {
+          applyTicket = true;
+        } else {
+          validBid = Math.max(0, Math.floor((maxBid - 100) / 50) * 50);
+          applyTicket = true;
+        }
       } else if (validBid > maxBid) {
         validBid = Math.floor(maxBid / 50) * 50;
       }
 
       state.bids[teamId] = validBid;
-      if (state.auctionPhase === 'BIDDING') {
-         state.secretTicketRequests[teamId] = applyTicket;
-      }
+      if (state.auctionPhase === 'BIDDING') state.secretTicketRequests[teamId] = applyTicket;
 
       if (state.teacherSocketId) {
         io.to(state.teacherSocketId).emit('teamBidStatus', {
-           teamId,
-           hasBid: true,
-           requestedTicket: state.auctionPhase === 'BIDDING' ? applyTicket : false
+          teamId,
+          hasBid: true,
+          requestedTicket: state.auctionPhase === 'BIDDING' ? applyTicket : false
         });
       }
       socket.emit('bidAccepted', { amount: validBid });
 
-      // 입찰 현황은 교사에게만 (학생에게 타 팀 입찰 여부 노출 방지)
       if (state.teacherSocketId) {
         io.to(state.teacherSocketId).emit('bidsUpdated', Object.keys(state.bids));
         io.to(state.teacherSocketId).emit('ticketRequestsUpdated', state.secretTicketRequests);
@@ -602,27 +634,28 @@ function setupSocketHandlers(io) {
     });
 
     socket.on('submitGuess', ({ amount }) => {
+      const roomId = socket.data?.roomId;
+      if (!roomId) return;
+      const state = rooms.get(roomId);
+      if (!state) return;
       const teamId = state.connectedTeams[socket.id];
       if (!teamId) return;
       if (state.auctionPhase !== 'BIDDING' && state.auctionPhase !== 'REBIDDING') return;
-      if (state.bids[teamId] !== undefined) return; // 이미 입찰한 팀은 예측 불가
+      if (state.bids[teamId] !== undefined) return;
 
       let validGuess = Math.max(0, parseInt(amount, 10) || 0);
-      if (validGuess % 50 !== 0) {
-        validGuess = Math.floor(validGuess / 50) * 50;
-      }
+      if (validGuess % 50 !== 0) validGuess = Math.floor(validGuess / 50) * 50;
 
       state.guesses[teamId] = validGuess;
 
       if (state.teacherSocketId) {
         io.to(state.teacherSocketId).emit('teamBidStatus', {
-           teamId,
-           hasBid: true,
-           requestedTicket: false,
-           isGuess: true
+          teamId,
+          hasBid: true,
+          requestedTicket: false,
+          isGuess: true
         });
       }
-
       socket.emit('bidAccepted', { amount: 0, isGuess: true });
       if (state.teacherSocketId) {
         io.to(state.teacherSocketId).emit('bidsUpdated', [...new Set([...Object.keys(state.bids), ...Object.keys(state.guesses)])]);
