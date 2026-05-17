@@ -11,7 +11,7 @@ import {
   Typography, TextField, Grid,
 } from '@mui/material';
 
-const CAT_COLORS = ['#7c6aff','#f59e0b','#f87171','#a599ff','#fbbf24','#fca5a5'];
+const CAT_COLORS = ['#1A3626', '#B54F35', '#D4AF37', '#54483a', '#5b6c50', '#a87c7c'];
 function getCatColor(i) { return CAT_COLORS[i % CAT_COLORS.length]; }
 
 function hexToRgb(hex) {

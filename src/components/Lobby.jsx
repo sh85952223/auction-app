@@ -129,7 +129,7 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTea
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             mb: 1.5,
           }}>
-            <Gavel size={28} color="#7c6aff" strokeWidth={2.5} />
+            <Gavel size={28} color="var(--violet)" strokeWidth={2.5} />
           </Box>
           <Typography variant="h5" fontWeight={800} letterSpacing="-0.03em">
             가족문화 경매소
@@ -151,7 +151,7 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTea
               {showTeacherMode && (
                 <RoleCard
                   onClick={() => setStep('TEACHER')}
-                  icon={<Gavel size={22} color="#7c6aff" />}
+                  icon={<Gavel size={22} color="var(--violet)" />}
                   title="교사 (재판장)"
                   desc="경매를 시작하고 관리합니다"
                 />
@@ -159,7 +159,7 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTea
 
               <RoleCard
                 onClick={() => setStep('SESSION_CODE')}
-                icon={<Users size={22} color="#7c6aff" />}
+                icon={<Users size={22} color="var(--violet)" />}
                 title="학생 (모둠)"
                 desc="세션 코드로 경매에 참여합니다"
               />
@@ -172,7 +172,7 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTea
               <BackBtn onClick={() => setStep('ROLE')} />
 
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2.5 }}>
-                <Gavel size={18} color="#7c6aff" />
+                <Gavel size={18} color="var(--violet)" />
                 <Typography fontWeight={700}>교사로 입장</Typography>
               </Stack>
 
@@ -210,7 +210,7 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTea
               {showTeacherMode && <BackBtn onClick={() => setStep('ROLE')} />}
 
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-                <Hash size={18} color="#7c6aff" />
+                <Hash size={18} color="var(--violet)" />
                 <Typography fontWeight={700}>세션 코드 입력</Typography>
               </Stack>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5, lineHeight: 1.6 }}>
@@ -256,7 +256,7 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTea
               <BackBtn onClick={() => setStep('SESSION_CODE')} label="코드 재입력" />
 
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-                <Users size={18} color="#7c6aff" />
+                <Users size={18} color="var(--violet)" />
                 <Typography fontWeight={700}>우리 모둠 선택</Typography>
               </Stack>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: '0.8rem' }}>

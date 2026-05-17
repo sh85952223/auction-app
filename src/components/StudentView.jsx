@@ -94,7 +94,7 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingBottom: isBidding && !bidSubmitted ? '340px' : '2rem' }}>
 
       {/* ── Top header bar ── */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 40, background: 'rgba(13,15,26,0.95)', backdropFilter: 'blur(16px)', borderBottom: '1px solid var(--border-default)', padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 40, background: 'var(--bg-overlay)', backdropFilter: 'blur(16px)', borderBottom: '1px solid var(--border-default)', padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
         <div>
           <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-1)' }}>{team?.name}</div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-2)', marginTop: '0.1rem' }}>
@@ -128,8 +128,8 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
         {currentItem && (isBidding || ['REVEALING','TIE_BREAKER','NO_BIDS'].includes(gameState.auctionPhase)) ? (
           <>
             {/* Current item display */}
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-xl)', padding: '1.75rem 1.5rem', textAlign: 'center', marginBottom: '1rem' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', padding: '0.25rem 0.75rem', background: 'var(--violet-dim)', border: '1px solid rgba(124,106,255,0.35)', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 700, color: '#a99aff', marginBottom: '1rem' }}>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-xl)', padding: '1.75rem 1.5rem', textAlign: 'center', marginBottom: '1rem' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', padding: '0.25rem 0.75rem', background: 'var(--violet-dim)', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 700, color: 'var(--violet)', marginBottom: '1rem' }}>
                 {currentItem.categoryName}
               </span>
               <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-1)', margin: '0 0 0.25rem', lineHeight: 1.3 }}>
@@ -144,13 +144,13 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
                 <div style={{ fontWeight: 700, color: 'var(--violet-light)', marginBottom: '0.75rem', fontSize: '0.9rem' }}>🔓 비밀 첩보 — 1차 입찰 결과</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.5rem' }}>
                   {gameState.teams.map(t => initialBids?.[t.id] !== undefined ? (
-                    <div key={t.id} style={{ padding: '0.6rem 0.75rem', background: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius-md)', borderLeft: '3px solid var(--violet-light)' }}>
+                    <div key={t.id} style={{ padding: '0.6rem 0.75rem', background: 'rgba(0,0,0,0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', borderLeft: '3px solid var(--violet-light)' }}>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-2)' }}>{t.name}</div>
                       <div style={{ fontFamily: 'JetBrains Mono,monospace', fontWeight: 700, fontSize: '1rem', color: 'var(--text-1)' }}>{initialBids[t.id]}</div>
                     </div>
                   ) : null)}
                 </div>
-                <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--violet-light)', fontWeight: 600 }}>💡 전략을 수정해 2차 입찰을 제출하세요.</p>
+                <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--violet)', fontWeight: 600 }}>💡 전략을 수정해 2차 입찰을 제출하세요.</p>
               </div>
             )}
 
@@ -181,7 +181,7 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
                     '& .MuiTabs-indicator': {
                       height: '100%',
                       borderRadius: 1.5,
-                      background: mode === 'BID' ? '#7c6aff' : '#a599ff',
+                      background: mode === 'BID' ? 'var(--violet)' : 'var(--violet-light)',
                       zIndex: 0,
                     },
                     '& .MuiTab-root': {
@@ -190,7 +190,7 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
                       fontWeight: 700,
                       fontSize: '0.85rem',
                       color: 'var(--text-2)',
-                      '&.Mui-selected': { color: '#fff' },
+                      '&.Mui-selected': { color: 'var(--bg-surface)' },
                     },
                   }}
                 >
@@ -355,7 +355,8 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
                       sx={{
                         py: 1.5, fontSize: '0.95rem', letterSpacing: '0.05em',
                         background: 'var(--violet-light)',
-                        '&:hover': { background: '#b8adff' },
+                        color: 'var(--bg-surface)',
+                        '&:hover': { background: 'var(--violet)' },
                       }}
                     >
                       예측 금액 제출

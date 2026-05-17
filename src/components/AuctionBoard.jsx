@@ -1,12 +1,12 @@
 import { Box, Typography, Card, CardContent, Grid } from '@mui/material';
 
 const CAT_COLORS = [
-  { text: '#7c6aff', bg: 'rgba(124,106,255,0.1)', border: 'rgba(124,106,255,0.25)' },
-  { text: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.25)'  },
-  { text: '#f87171', bg: 'rgba(248,113,113,0.1)', border: 'rgba(248,113,113,0.25)' },
-  { text: '#a599ff', bg: 'rgba(165,153,255,0.1)', border: 'rgba(165,153,255,0.25)' },
-  { text: '#fbbf24', bg: 'rgba(251,191,36,0.1)',  border: 'rgba(251,191,36,0.25)'  },
-  { text: '#fca5a5', bg: 'rgba(252,165,165,0.1)', border: 'rgba(252,165,165,0.25)' },
+  { text: '#1A3626', bg: 'rgba(26,54,38,0.06)', border: 'rgba(26,54,38,0.18)' }, // Forest Green
+  { text: '#B54F35', bg: 'rgba(181,79,53,0.06)', border: 'rgba(181,79,53,0.18)' }, // Rust Red
+  { text: '#D4AF37', bg: 'rgba(212,175,55,0.06)', border: 'rgba(212,175,55,0.18)' }, // Gold
+  { text: '#54483a', bg: 'rgba(84,72,58,0.06)', border: 'rgba(84,72,58,0.18)' }, // Warm Dark Brown
+  { text: '#5b6c50', bg: 'rgba(91,108,80,0.06)', border: 'rgba(91,108,80,0.18)' }, // Sage Green
+  { text: '#a87c7c', bg: 'rgba(168,124,124,0.06)', border: 'rgba(168,124,124,0.18)' }, // Dusty Rose
 ];
 
 function getCat(i) { return CAT_COLORS[i % CAT_COLORS.length]; }

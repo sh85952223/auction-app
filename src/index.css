@@ -1,69 +1,76 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,400&family=Noto+Serif+KR:wght@300;400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
 
 /* ─── Design Tokens ─────────────────────────────────────── */
 :root {
-  --bg-base:     #07080f;
-  --bg-surface:  #0d0f1a;
-  --bg-card:     #131520;
-  --bg-card-2:   #191b2a;
-  --bg-overlay:  rgba(7,8,15,0.92);
+  --bg-base:     #F4F1EC; /* Cream */
+  --bg-surface:  #FCFAF8; /* Paper */
+  --bg-card:     #FCFAF8;
+  --bg-card-2:   #F4F1EC;
+  --bg-overlay:  rgba(244,241,236,0.94);
 
-  --border-subtle:  rgba(255,255,255,0.05);
-  --border-default: rgba(255,255,255,0.1);
-  --border-strong:  rgba(255,255,255,0.18);
+  --border-subtle:  rgba(0,0,0,0.04);
+  --border-default: rgba(0,0,0,0.08);
+  --border-strong:  rgba(0,0,0,0.15);
 
   /* ── 3 Brand Colors ───────────────────────────────────── */
-  /* Primary: violet */
-  --violet:       #7c6aff;
-  --violet-dim:   rgba(124,106,255,0.15);
-  --violet-glow:  rgba(124,106,255,0.35);
-  --violet-light: #a599ff;
-  --violet-light-dim: rgba(165,153,255,0.15);
+  /* Primary: Green */
+  --violet:       #1A3626; /* Forest Green (--accent-green) */
+  --violet-dim:   rgba(26,54,38,0.08);
+  --violet-glow:  rgba(26,54,38,0.18);
+  --violet-light: #3d5c49;
+  --violet-light-dim: rgba(61,92,73,0.08);
 
-  /* Secondary: amber (financial / coins) */
-  --amber:        #f59e0b;
-  --amber-dim:    rgba(245,158,11,0.12);
-  --amber-glow:   rgba(245,158,11,0.3);
+  /* Secondary: Rust Red */
+  --amber:        #B54F35; /* Rust Red (--accent-rust) */
+  --amber-dim:    rgba(181,79,53,0.08);
+  --amber-glow:   rgba(181,79,53,0.18);
 
-  /* Error: rose (danger / destructive) */
-  --rose:         #f87171;
-  --rose-dim:     rgba(248,113,113,0.12);
+  /* Error: Rust Red */
+  --rose:         #B54F35;
+  --rose-dim:     rgba(181,79,53,0.08);
 
-  /* Semantic success (online status only — not a brand color) */
-  --emerald:      #34d399;
-  --emerald-dim:  rgba(52,211,153,0.12);
+  /* Semantic success */
+  --emerald:      #1A3626;
+  --emerald-dim:  rgba(26,54,38,0.08);
 
-  /* Aliases for backward compat — sky → violet-light, orange → amber */
-  --sky:          #a599ff;
-  --sky-dim:      rgba(165,153,255,0.12);
-  --sky-glow:     rgba(165,153,255,0.3);
-  --orange:       #f59e0b;
+  /* Aliases for backward compat */
+  --sky:          #3d5c49;
+  --sky-dim:      rgba(61,92,73,0.08);
+  --sky-glow:     rgba(61,92,73,0.18);
+  --orange:       #B54F35;
 
-  --text-1: #f0f0f8;
-  --text-2: #8b8da8;
-  --text-3: #4a4b60;
+  --text-1: #1A1A1A; /* Dark Gray */
+  --text-2: #807D78; /* Muted Gray */
+  --text-3: #b0aeaa;
 
   --radius-sm:  6px;
-  --radius-md:  10px;
-  --radius-lg:  14px;
-  --radius-xl:  20px;
+  --radius-md:  12px;
+  --radius-lg:  16px;
+  --radius-xl:  24px;
   --radius-full: 999px;
 
-  --shadow-sm:  0 1px 3px rgba(0,0,0,0.4);
-  --shadow-md:  0 4px 16px rgba(0,0,0,0.5);
-  --shadow-lg:  0 12px 40px rgba(0,0,0,0.6);
-  --shadow-glow-violet: 0 0 20px rgba(124,106,255,0.25);
-  --shadow-glow-amber:  0 0 20px rgba(245,158,11,0.25);
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.05);
+  --shadow-md:  0 10px 30px rgba(0,0,0,0.03);
+  --shadow-lg:  0 30px 60px rgba(0,0,0,0.05);
+  --shadow-glow-violet: 0 4px 20px rgba(26,54,38,0.1);
+  --shadow-glow-amber:  0 4px 20px rgba(181,79,53,0.1);
 
   --transition: 0.18s cubic-bezier(0.4,0,0.2,1);
+
+  --font-serif-en: 'Cormorant Garamond', serif;
+  --font-serif-kr: 'Noto Serif KR', serif;
+  --font-sans: 'Pretendard', sans-serif;
+  --font-numbers: 'Playfair Display', serif;
 }
 
 /* ─── Reset ─────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: 'Inter', -apple-system, sans-serif;
+  font-family: var(--font-sans);
   color: var(--text-1);
+  background-color: #e5e0d8;
   min-height: 100vh;
   line-height: 1.5;
 }
