@@ -12,19 +12,32 @@
   --border-default: rgba(255,255,255,0.1);
   --border-strong:  rgba(255,255,255,0.18);
 
+  /* ── 3 Brand Colors ───────────────────────────────────── */
+  /* Primary: violet */
   --violet:       #7c6aff;
   --violet-dim:   rgba(124,106,255,0.15);
   --violet-glow:  rgba(124,106,255,0.35);
+  --violet-light: #a599ff;
+  --violet-light-dim: rgba(165,153,255,0.15);
+
+  /* Secondary: amber (financial / coins) */
   --amber:        #f59e0b;
   --amber-dim:    rgba(245,158,11,0.12);
   --amber-glow:   rgba(245,158,11,0.3);
-  --sky:          #38bdf8;
-  --sky-dim:      rgba(56,189,248,0.12);
-  --emerald:      #34d399;
-  --emerald-dim:  rgba(52,211,153,0.12);
+
+  /* Error: rose (danger / destructive) */
   --rose:         #f87171;
   --rose-dim:     rgba(248,113,113,0.12);
-  --orange:       #fb923c;
+
+  /* Semantic success (online status only — not a brand color) */
+  --emerald:      #34d399;
+  --emerald-dim:  rgba(52,211,153,0.12);
+
+  /* Aliases for backward compat — sky → violet-light, orange → amber */
+  --sky:          #a599ff;
+  --sky-dim:      rgba(165,153,255,0.12);
+  --sky-glow:     rgba(165,153,255,0.3);
+  --orange:       #f59e0b;
 
   --text-1: #f0f0f8;
   --text-2: #8b8da8;
@@ -50,13 +63,9 @@
 
 body {
   font-family: 'Inter', -apple-system, sans-serif;
-  background: var(--bg-base);
   color: var(--text-1);
   min-height: 100vh;
   line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  background-image:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(124,106,255,0.08) 0%, transparent 60%);
 }
 
 /* ─── Layout ─────────────────────────────────────────────── */
@@ -286,7 +295,7 @@ body {
 
 .chip-violet { background: var(--violet-dim); color: #a99aff; border-color: rgba(124,106,255,0.3); }
 .chip-amber  { background: var(--amber-dim);  color: #fcd34d; border-color: rgba(245,158,11,0.3); }
-.chip-sky    { background: var(--sky-dim);    color: var(--sky);  border-color: rgba(56,189,248,0.3); }
+.chip-sky    { background: var(--sky-dim);    color: var(--sky);  border-color: rgba(165,153,255,0.3); }
 .chip-emerald{ background: var(--emerald-dim);color: var(--emerald); border-color: rgba(52,211,153,0.3); }
 .chip-rose   { background: var(--rose-dim);   color: var(--rose);  border-color: rgba(248,113,113,0.3); }
 .chip-gray   { background: rgba(255,255,255,0.05); color: var(--text-2); border-color: var(--border-default); }

@@ -1,10 +1,12 @@
+import { Box, Typography, Card, CardContent, Grid } from '@mui/material';
+
 const CAT_COLORS = [
-  { text: '#a78bfa', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.25)' },
-  { text: '#38bdf8', bg: 'rgba(56,189,248,0.1)',  border: 'rgba(56,189,248,0.25)' },
-  { text: '#34d399', bg: 'rgba(52,211,153,0.1)',  border: 'rgba(52,211,153,0.25)' },
-  { text: '#fb923c', bg: 'rgba(251,146,60,0.1)',  border: 'rgba(251,146,60,0.25)' },
-  { text: '#f472b6', bg: 'rgba(244,114,182,0.1)', border: 'rgba(244,114,182,0.25)' },
-  { text: '#facc15', bg: 'rgba(250,204,21,0.1)',  border: 'rgba(250,204,21,0.25)' },
+  { text: '#7c6aff', bg: 'rgba(124,106,255,0.1)', border: 'rgba(124,106,255,0.25)' },
+  { text: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.25)'  },
+  { text: '#f87171', bg: 'rgba(248,113,113,0.1)', border: 'rgba(248,113,113,0.25)' },
+  { text: '#a599ff', bg: 'rgba(165,153,255,0.1)', border: 'rgba(165,153,255,0.25)' },
+  { text: '#fbbf24', bg: 'rgba(251,191,36,0.1)',  border: 'rgba(251,191,36,0.25)'  },
+  { text: '#fca5a5', bg: 'rgba(252,165,165,0.1)', border: 'rgba(252,165,165,0.25)' },
 ];
 
 function getCat(i) { return CAT_COLORS[i % CAT_COLORS.length]; }
@@ -13,76 +15,116 @@ export default function AuctionBoard({ gameState, selectedItemId, onSelectItem, 
   const categories = (gameState.categoryConfig || []).map(c => ({ id: c.id, name: c.name }));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       {categories.map((cat, catIdx) => {
         const col = getCat(catIdx);
         const catItems = gameState.items.filter(i => i.category === cat.id);
 
         return (
-          <div key={cat.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+          <Box
+            key={cat.id}
+            sx={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-default)',
+              borderRadius: 2.5,
+              overflow: 'hidden',
+            }}
+          >
             {/* Category header */}
-            <div style={{ padding: '0.75rem 1.25rem', background: col.bg, borderBottom: `1px solid ${col.border}`, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <span style={{ width: 10, height: 10, borderRadius: '50%', background: col.text, flexShrink: 0, boxShadow: `0 0 8px ${col.text}` }} />
-              <span style={{ fontWeight: 700, fontSize: '0.9rem', color: col.text, letterSpacing: '0.02em' }}>{cat.name}</span>
-              <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: col.text, opacity: 0.7 }}>
+            <Box
+              sx={{
+                px: 2, py: 1.25,
+                background: col.bg,
+                borderBottom: `1px solid ${col.border}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 10, height: 10,
+                  borderRadius: '50%',
+                  background: col.text,
+                  flexShrink: 0,
+                  boxShadow: `0 0 8px ${col.text}`,
+                }}
+              />
+              <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: col.text, letterSpacing: '0.02em' }}>
+                {cat.name}
+              </Typography>
+              <Typography sx={{ ml: 'auto', fontSize: '0.75rem', color: col.text, opacity: 0.7 }}>
                 {catItems.filter(i => i.isSold).length}/{catItems.length} 낙찰
-              </span>
-            </div>
+              </Typography>
+            </Box>
 
             {/* Items grid */}
-            <div style={{ padding: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.6rem' }}>
-              {catItems.map(item => {
-                const isActive = selectedItemId === item.id || gameState.currentAuctionItemId === item.id;
-                const canSelect = isTeacher && !item.isSold && gameState.auctionPhase === 'WAITING';
+            <Box sx={{ p: 1.5 }}>
+              <Grid container spacing={1}>
+                {catItems.map(item => {
+                  const isActive = selectedItemId === item.id || gameState.currentAuctionItemId === item.id;
+                  const canSelect = isTeacher && !item.isSold && gameState.auctionPhase === 'WAITING';
 
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() => canSelect && onSelectItem(item.id)}
-                    style={{
-                      padding: '0.9rem 1rem',
-                      borderRadius: 'var(--radius-md)',
-                      border: `1px solid ${isActive ? col.text : item.isSold ? 'var(--border-subtle)' : 'var(--border-default)'}`,
-                      background: isActive ? col.bg : item.isSold ? 'transparent' : 'rgba(255,255,255,0.02)',
-                      cursor: canSelect ? 'pointer' : 'default',
-                      transition: 'all 0.15s',
-                      opacity: item.isSold ? 0.5 : 1,
-                      position: 'relative',
-                      overflow: 'hidden',
-                      boxShadow: isActive ? `0 0 16px ${col.border}` : 'none',
-                      transform: isActive ? 'scale(1.02)' : 'scale(1)',
-                    }}
-                    onMouseEnter={e => { if (canSelect) { e.currentTarget.style.borderColor = col.text; e.currentTarget.style.background = col.bg; e.currentTarget.style.transform = 'translateY(-2px)'; } }}
-                    onMouseLeave={e => { if (canSelect && !isActive) { e.currentTarget.style.borderColor = 'var(--border-default)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; e.currentTarget.style.transform = 'scale(1)'; } }}
-                  >
-                    <div style={{ fontSize: '0.875rem', color: item.isSold ? 'var(--text-3)' : 'var(--text-1)', fontWeight: 500, lineHeight: 1.4, wordBreak: 'keep-all', marginBottom: '0.6rem' }}>
-                      {item.name}
-                    </div>
+                  return (
+                    <Grid item key={item.id} xs={6} sm={4} md={3}>
+                      <Card
+                        onClick={() => canSelect && onSelectItem(item.id)}
+                        sx={{
+                          border: `1px solid ${isActive ? col.text : item.isSold ? 'var(--border-subtle)' : 'var(--border-default)'}`,
+                          background: isActive ? col.bg : item.isSold ? 'transparent' : 'rgba(255,255,255,0.02)',
+                          cursor: canSelect ? 'pointer' : 'default',
+                          opacity: item.isSold ? 0.5 : 1,
+                          boxShadow: isActive ? `0 0 16px ${col.border}` : 'none',
+                          transform: isActive ? 'scale(1.02)' : 'scale(1)',
+                          transition: 'all 0.15s',
+                          '&:hover': canSelect ? {
+                            borderColor: col.text,
+                            background: col.bg,
+                            transform: 'translateY(-2px)',
+                          } : {},
+                        }}
+                      >
+                        <CardContent sx={{ p: '0.9rem 1rem !important' }}>
+                          <Typography
+                            sx={{
+                              fontSize: '0.875rem',
+                              color: item.isSold ? 'var(--text-3)' : 'var(--text-1)',
+                              fontWeight: 500,
+                              lineHeight: 1.4,
+                              wordBreak: 'keep-all',
+                              mb: 0.75,
+                            }}
+                          >
+                            {item.name}
+                          </Typography>
 
-                    {item.isSold ? (
-                      <div>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--amber)', marginBottom: '0.15rem' }}>
-                          {gameState.teams.find(t => t.id === item.winner)?.name}
-                        </div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-3)', fontFamily: 'JetBrains Mono, monospace' }}>
-                          {item.winningBid} 코인
-                        </div>
-                      </div>
-                    ) : isActive ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: col.text, animation: 'pulse-glow 1.5s infinite' }} />
-                        <span style={{ fontSize: '0.75rem', color: col.text, fontWeight: 600 }}>진행 중</span>
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-3)' }}>대기 중</div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+                          {item.isSold ? (
+                            <Box>
+                              <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--amber)', mb: 0.25 }}>
+                                {gameState.teams.find(t => t.id === item.winner)?.name}
+                              </Typography>
+                              <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-3)', fontFamily: 'JetBrains Mono, monospace' }}>
+                                {item.winningBid} 코인
+                              </Typography>
+                            </Box>
+                          ) : isActive ? (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: col.text, animation: 'pulse-glow 1.5s infinite' }} />
+                              <Typography sx={{ fontSize: '0.75rem', color: col.text, fontWeight: 600 }}>진행 중</Typography>
+                            </Box>
+                          ) : (
+                            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-3)' }}>대기 중</Typography>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  );
+                })}
+              </Grid>
+            </Box>
+          </Box>
         );
       })}
-    </div>
+    </Box>
   );
 }

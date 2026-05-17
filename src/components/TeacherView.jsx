@@ -1,12 +1,17 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import AuctionBoard from './AuctionBoard';
 import {
   Gavel, Play, Eye, Check, FileText, X, Settings, UserPlus,
   Trash2, RefreshCw, BookOpen, PlusCircle, MoreVertical, Download, Copy, LogOut
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import {
+  AppBar, Toolbar, Box, Chip, Button, IconButton, Menu, MenuItem,
+  Divider, Dialog, DialogTitle, DialogContent, DialogActions,
+  Typography, TextField, Grid,
+} from '@mui/material';
 
-const CAT_COLORS = ['#a78bfa','#38bdf8','#34d399','#fb923c','#f472b6','#facc15'];
+const CAT_COLORS = ['#7c6aff','#f59e0b','#f87171','#a599ff','#fbbf24','#fca5a5'];
 function getCatColor(i) { return CAT_COLORS[i % CAT_COLORS.length]; }
 
 function hexToRgb(hex) {
@@ -14,15 +19,15 @@ function hexToRgb(hex) {
   return r ? `${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}` : '255,255,255';
 }
 
-const PHASE_LABELS = {
-  WAITING:          { text: '대기 중',     color: 'var(--text-2)',  bg: 'rgba(255,255,255,0.06)' },
-  BIDDING:          { text: '입찰 진행',   color: 'var(--violet)', bg: 'var(--violet-dim)' },
-  REBIDDING:        { text: '재입찰',      color: 'var(--sky)',    bg: 'var(--sky-dim)' },
-  REVEALING:        { text: '결과 공개',   color: 'var(--amber)', bg: 'var(--amber-dim)' },
-  TIE_BREAKER:      { text: '동점 결정',   color: 'var(--rose)',  bg: 'var(--rose-dim)' },
-  NO_BIDS:          { text: '유찰',        color: 'var(--text-2)', bg: 'rgba(255,255,255,0.06)' },
-  SOLD:             { text: '낙찰 완료',   color: 'var(--emerald)',bg: 'var(--emerald-dim)' },
-  CATEGORY_WRAP_UP: { text: '카테고리 마무리', color: 'var(--sky)', bg: 'var(--sky-dim)' },
+const PHASE_META = {
+  WAITING:          { text: '대기 중',         color: 'default' },
+  BIDDING:          { text: '입찰 진행',        color: 'primary' },
+  REBIDDING:        { text: '재입찰',           color: 'primary' },
+  REVEALING:        { text: '결과 공개',        color: 'secondary' },
+  TIE_BREAKER:      { text: '동점 결정',        color: 'error'   },
+  NO_BIDS:          { text: '유찰',             color: 'default' },
+  SOLD:             { text: '낙찰 완료',        color: 'success' },
+  CATEGORY_WRAP_UP: { text: '카테고리 마무리',  color: 'primary' },
 };
 
 export default function TeacherView({ gameState, socket, teamBidStatus, connectedTeams, initialBids, sessionCode, onLogout }) {
@@ -33,18 +38,11 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
   const [editingConfig, setEditingConfig]       = useState(null);
   const [editingGameConfig, setEditingGameConfig] = useState(null);
   const [isProjectorMode, setIsProjectorMode]   = useState(true);
-  const [showMenu, setShowMenu]                 = useState(false);
+  const [menuAnchor, setMenuAnchor]             = useState(null);
   const [codeCopied, setCodeCopied]             = useState(false);
   const [savedSubjects, setSavedSubjects]       = useState([]);
   const [subjectsLoading, setSubjectsLoading]   = useState(false);
   const [subjectSaveName, setSubjectSaveName]   = useState('');
-  const menuRef = useRef(null);
-
-  useEffect(() => {
-    const h = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false); };
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
-  }, []);
 
   useEffect(() => {
     const handler = (subjects) => { setSavedSubjects(subjects); setSubjectsLoading(false); };
@@ -126,229 +124,244 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
   };
 
   const phase = gameState.auctionPhase;
-  const phaseInfo = PHASE_LABELS[phase] || PHASE_LABELS.WAITING;
+  const phaseMeta = PHASE_META[phase] || PHASE_META.WAITING;
 
-  /* ── Styles ── */
-  const S = {
-    header: {
-      position: 'sticky', top: 0, zIndex: 50,
-      background: 'rgba(13,15,26,0.92)',
-      backdropFilter: 'blur(20px)',
-      borderBottom: '1px solid var(--border-default)',
-      padding: '0.75rem 1.25rem',
-      display: 'flex', alignItems: 'center', gap: '0.75rem',
-      flexWrap: 'wrap',
-    },
-    phaseChip: {
-      padding: '0.3rem 0.75rem',
-      borderRadius: 'var(--radius-full)',
-      fontSize: '0.8rem', fontWeight: 700,
-      color: phaseInfo.color,
-      background: phaseInfo.bg,
-      border: `1px solid ${phaseInfo.color}40`,
-      letterSpacing: '0.02em',
-      whiteSpace: 'nowrap',
-    },
-    actionBtn: (color = 'var(--violet)') => ({
-      display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-      padding: '0.55rem 1rem',
-      background: color === 'var(--violet)' ? color : color,
-      color: color === 'var(--amber)' ? '#1a1000' : '#fff',
-      border: `1px solid ${color}`,
-      borderRadius: 'var(--radius-md)',
-      cursor: 'pointer', fontFamily: 'Inter,sans-serif',
-      fontSize: '0.875rem', fontWeight: 700,
-      boxShadow: `0 2px 8px ${color}40`,
-      transition: 'all 0.15s',
-      whiteSpace: 'nowrap',
-    }),
-    menuBtn: {
-      display: 'flex', alignItems: 'center', gap: '0.6rem',
-      width: '100%', padding: '0.65rem 1rem',
-      background: 'transparent', border: 'none',
-      color: 'var(--text-1)', cursor: 'pointer',
-      fontFamily: 'Inter,sans-serif', fontSize: '0.875rem',
-      textAlign: 'left', transition: 'background 0.12s',
-      borderRadius: 'var(--radius-sm)',
-    },
-    teamCard: (connected) => ({
-      padding: '0.85rem 1rem',
-      background: connected ? 'rgba(52,211,153,0.05)' : 'rgba(255,255,255,0.02)',
-      border: `1px solid ${connected ? 'rgba(52,211,153,0.2)' : 'var(--border-subtle)'}`,
-      borderRadius: 'var(--radius-md)',
-      display: 'flex', flexDirection: 'column', gap: '0.5rem',
-    }),
-    modal: {
-      position: 'fixed', inset: 0,
-      background: 'var(--bg-overlay)',
-      backdropFilter: 'blur(8px)',
-      zIndex: 9999, padding: '1.5rem',
-      overflowY: 'auto', display: 'flex',
-      alignItems: 'flex-start', justifyContent: 'center',
-    },
-    modalBox: {
-      background: 'var(--bg-card-2)',
-      border: '1px solid var(--border-strong)',
-      borderRadius: 'var(--radius-xl)',
-      padding: '2rem', width: '100%',
-      maxWidth: '1100px', position: 'relative',
-      margin: 'auto',
-      boxShadow: 'var(--shadow-lg)',
-    },
-  };
+  const teamCardSx = (connected) => ({
+    p: '0.85rem 1rem',
+    background: connected ? 'rgba(52,211,153,0.05)' : 'rgba(255,255,255,0.02)',
+    border: `1px solid ${connected ? 'rgba(52,211,153,0.2)' : 'var(--border-subtle)'}`,
+    borderRadius: 2.5,
+    display: 'flex', flexDirection: 'column', gap: 1,
+  });
 
   return (
-    <div style={{ paddingBottom: '3rem' }}>
+    <Box sx={{ pb: 6 }}>
 
-      {/* ── Sticky Header ── */}
-      <div style={S.header}>
-        {/* Left: title + phase */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Gavel size={20} color="var(--amber)" />
-            <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-1)', whiteSpace: 'nowrap' }}>
-              재판장 대시보드
-              {gameState.classInfo && <span style={{ color: 'var(--text-2)', fontWeight: 500 }}> · {gameState.classInfo.grade}학년 {gameState.classInfo.classNum}반</span>}
-            </span>
-          </div>
+      {/* ── Sticky AppBar ── */}
+      <AppBar
+        position="sticky"
+        elevation={0}
+        sx={{
+          background: 'rgba(13,15,26,0.92)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: '1px solid var(--border-default)',
+          boxShadow: 'none',
+        }}
+      >
+        <Toolbar sx={{ gap: 1.5, flexWrap: 'wrap', py: 0.5, minHeight: '56px !important' }}>
 
-          {/* Session code */}
-          {sessionCode && (
-            <button
-              onClick={handleCopyCode}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.75rem', background: 'var(--sky-dim)', border: '1px solid rgba(56,189,248,0.35)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontFamily: 'JetBrains Mono,monospace', fontSize: '0.95rem', fontWeight: 700, color: 'var(--sky)', letterSpacing: '0.18em', transition: 'all 0.15s' }}
-              title="클릭하여 복사"
-            >
-              {sessionCode}
-              {codeCopied ? <Check size={13} color="var(--emerald)" /> : <Copy size={13} />}
-            </button>
-          )}
+          {/* Left: title + code + phase + projector */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <Gavel size={20} color="var(--amber)" />
+              <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: 'text.primary', whiteSpace: 'nowrap' }}>
+                재판장 대시보드
+                {gameState.classInfo && (
+                  <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                    {' '}· {gameState.classInfo.grade}학년 {gameState.classInfo.classNum}반
+                  </Box>
+                )}
+              </Typography>
+            </Box>
 
-          {/* Phase chip */}
-          <span style={S.phaseChip}>{phaseInfo.text}</span>
+            {/* Session code badge */}
+            {sessionCode && (
+              <Chip
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography sx={{ fontFamily: 'JetBrains Mono,monospace', fontSize: '0.95rem', fontWeight: 700, letterSpacing: '0.18em' }}>
+                      {sessionCode}
+                    </Typography>
+                    {codeCopied ? <Check size={13} color="var(--emerald)" /> : <Copy size={13} />}
+                  </Box>
+                }
+                onClick={handleCopyCode}
+                title="클릭하여 복사"
+                size="small"
+                sx={{
+                  background: 'var(--violet-light-dim)',
+                  border: '1px solid rgba(165,153,255,0.35)',
+                  color: 'var(--violet-light)',
+                  cursor: 'pointer',
+                  height: 30,
+                  '& .MuiChip-label': { px: 1.25 },
+                }}
+              />
+            )}
 
-          {/* Projector toggle */}
-          <button
-            onClick={() => setIsProjectorMode(v => !v)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.7rem', background: isProjectorMode ? 'var(--amber-dim)' : 'transparent', border: `1px solid ${isProjectorMode ? 'rgba(245,158,11,0.4)' : 'var(--border-default)'}`, borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, color: isProjectorMode ? 'var(--amber)' : 'var(--text-2)', transition: 'all 0.15s', fontFamily: 'Inter,sans-serif' }}
-          >
-            <Eye size={13} /> {isProjectorMode ? '프로젝터 ON' : '프로젝터 OFF'}
-          </button>
-        </div>
+            {/* Phase chip */}
+            <Chip
+              label={phaseMeta.text}
+              color={phaseMeta.color}
+              size="small"
+              sx={{ fontWeight: 700, fontSize: '0.8rem', height: 28 }}
+            />
 
-        {/* Right: action buttons */}
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          {phase === 'WAITING' && (
-            <button style={S.actionBtn()} disabled={!selectedItemId} onClick={() => socket.emit('startAuctionFor', selectedItemId)}>
-              <Play size={15} /> 경매 시작
-            </button>
-          )}
-          {phase === 'BIDDING' && (
-            <>
-              {Object.values(gameState.secretTicketRequests || {}).some(Boolean) && (
-                <button style={S.actionBtn('var(--sky)')} onClick={() => socket.emit('approveSecretTickets')}>
-                  <Eye size={15} /> 해제권 허가
-                </button>
-              )}
-              <button style={S.actionBtn()} onClick={() => socket.emit('revealBids')}>
-                <Eye size={15} /> 마감 · 공개
-              </button>
-            </>
-          )}
-          {phase === 'REBIDDING' && (
-            <button style={S.actionBtn()} onClick={() => socket.emit('revealBids')}>
-              <Eye size={15} /> 재입찰 마감
-            </button>
-          )}
-          {phase === 'REVEALING' && (
-            <button style={S.actionBtn('var(--amber)')} onClick={() => socket.emit('completeSale')}>
-              <Gavel size={15} /> 낙찰 확정
-            </button>
-          )}
-          {phase === 'TIE_BREAKER' && gameState.tiedTeams?.map(tId => {
-            const team = gameState.teams.find(t => t.id === tId);
-            return (
-              <button key={tId} style={S.actionBtn('var(--rose)')} onClick={() => socket.emit('resolveTie', tId)}>
-                <Gavel size={15} /> {team?.name} 승리
-              </button>
-            );
-          })}
-          {(phase === 'SOLD' || phase === 'NO_BIDS') && (
-            <button style={S.actionBtn('var(--emerald)')} onClick={() => { setSelectedItemId(null); socket.emit('nextItem'); }}>
-              <Check size={15} /> 다음 경매
-            </button>
-          )}
-          {phase === 'CATEGORY_WRAP_UP' && (
-            <span style={{ fontSize: '0.8rem', color: 'var(--sky)', fontWeight: 600 }}>아래 모달에서 처리 방식을 선택하세요</span>
-          )}
+            {/* Projector toggle */}
+            <Chip
+              icon={<Eye size={13} />}
+              label={isProjectorMode ? '프로젝터 ON' : '프로젝터 OFF'}
+              onClick={() => setIsProjectorMode(v => !v)}
+              size="small"
+              sx={{
+                background: isProjectorMode ? 'var(--amber-dim)' : 'transparent',
+                border: `1px solid ${isProjectorMode ? 'rgba(245,158,11,0.4)' : 'var(--border-default)'}`,
+                color: isProjectorMode ? 'var(--amber)' : 'text.secondary',
+                fontWeight: 700, fontSize: '0.75rem', height: 28, cursor: 'pointer',
+                '& .MuiChip-icon': { color: 'inherit' },
+              }}
+            />
+          </Box>
 
-          {/* ⋮ Menu */}
-          <div ref={menuRef} style={{ position: 'relative' }}>
-            <button
-              onClick={() => setShowMenu(v => !v)}
-              style={{ padding: '0.5rem', background: showMenu ? 'rgba(255,255,255,0.08)' : 'transparent', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', color: 'var(--text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all 0.15s' }}
+          {/* Right: action buttons */}
+          <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', flexWrap: 'wrap' }}>
+            {phase === 'WAITING' && (
+              <Button
+                variant="contained" color="primary" size="small"
+                disabled={!selectedItemId}
+                startIcon={<Play size={15} />}
+                onClick={() => socket.emit('startAuctionFor', selectedItemId)}
+              >
+                경매 시작
+              </Button>
+            )}
+            {phase === 'BIDDING' && (
+              <>
+                {Object.values(gameState.secretTicketRequests || {}).some(Boolean) && (
+                  <Button
+                    variant="outlined" color="primary" size="small"
+                    startIcon={<Eye size={15} />}
+                    onClick={() => socket.emit('approveSecretTickets')}
+                  >
+                    해제권 허가
+                  </Button>
+                )}
+                <Button
+                  variant="contained" color="primary" size="small"
+                  startIcon={<Eye size={15} />}
+                  onClick={() => socket.emit('revealBids')}
+                >
+                  마감 · 공개
+                </Button>
+              </>
+            )}
+            {phase === 'REBIDDING' && (
+              <Button
+                variant="contained" color="primary" size="small"
+                startIcon={<Eye size={15} />}
+                onClick={() => socket.emit('revealBids')}
+              >
+                재입찰 마감
+              </Button>
+            )}
+            {phase === 'REVEALING' && (
+              <Button
+                variant="contained" color="secondary" size="small"
+                startIcon={<Gavel size={15} />}
+                onClick={() => socket.emit('completeSale')}
+              >
+                낙찰 확정
+              </Button>
+            )}
+            {phase === 'TIE_BREAKER' && gameState.tiedTeams?.map(tId => {
+              const team = gameState.teams.find(t => t.id === tId);
+              return (
+                <Button
+                  key={tId}
+                  variant="contained" color="error" size="small"
+                  startIcon={<Gavel size={15} />}
+                  onClick={() => socket.emit('resolveTie', tId)}
+                >
+                  {team?.name} 승리
+                </Button>
+              );
+            })}
+            {(phase === 'SOLD' || phase === 'NO_BIDS') && (
+              <Button
+                variant="contained" color="success" size="small"
+                startIcon={<Check size={15} />}
+                onClick={() => { setSelectedItemId(null); socket.emit('nextItem'); }}
+                sx={{ background: 'var(--emerald)', '&:hover': { background: '#2ab882' } }}
+              >
+                다음 경매
+              </Button>
+            )}
+            {phase === 'CATEGORY_WRAP_UP' && (
+              <Typography sx={{ fontSize: '0.8rem', color: 'var(--violet-light)', fontWeight: 600 }}>
+                아래 모달에서 처리 방식을 선택하세요
+              </Typography>
+            )}
+
+            {/* ⋮ Menu */}
+            <IconButton
+              size="small"
+              onClick={e => setMenuAnchor(e.currentTarget)}
+              sx={{
+                border: '1px solid var(--border-default)',
+                borderRadius: 2,
+                color: 'text.secondary',
+                background: menuAnchor ? 'rgba(255,255,255,0.08)' : 'transparent',
+              }}
             >
               <MoreVertical size={18} />
-            </button>
-            {showMenu && (
-              <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', background: 'var(--bg-card-2)', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', zIndex: 200, minWidth: '190px', padding: '0.4rem', overflow: 'hidden' }}>
-                {[
-                  { icon: <FileText size={15} />, label: '결과 리포트', action: () => { setShowDashboard(true); setShowMenu(false); } },
-                  { icon: <Settings size={15} />, label: '모둠 관리', action: () => { setShowTeamMgmt(true); setShowMenu(false); } },
-                  { icon: <BookOpen size={15} />, label: '경매 설정', action: () => { openCategoryConfig(); setShowMenu(false); } },
-                ].map(item => (
-                  <button key={item.label} style={S.menuBtn} onClick={item.action}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    {item.icon} {item.label}
-                  </button>
-                ))}
-                <div style={{ height: 1, background: 'var(--border-subtle)', margin: '0.3rem 0' }} />
-                {phase === 'WAITING' && (
-                  <button style={{ ...S.menuBtn, color: 'var(--rose)' }}
-                    onClick={() => { if (confirm('전체 경매를 초기화하시겠습니까?')) { socket.emit('resetGame'); setShowMenu(false); } }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--rose-dim)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <RefreshCw size={15} /> 전체 초기화
-                  </button>
-                )}
-                <button style={{ ...S.menuBtn, color: 'var(--text-2)' }}
-                  onClick={() => { setShowMenu(false); onLogout(); }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <LogOut size={15} /> 로그아웃
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+            </IconButton>
+            <Menu
+              anchorEl={menuAnchor}
+              open={Boolean(menuAnchor)}
+              onClose={() => setMenuAnchor(null)}
+              PaperProps={{ sx: { minWidth: 190, mt: 0.75 } }}
+            >
+              <MenuItem onClick={() => { setShowDashboard(true); setMenuAnchor(null); }}>
+                <FileText size={15} style={{ marginRight: 8 }} /> 결과 리포트
+              </MenuItem>
+              <MenuItem onClick={() => { setShowTeamMgmt(true); setMenuAnchor(null); }}>
+                <Settings size={15} style={{ marginRight: 8 }} /> 모둠 관리
+              </MenuItem>
+              <MenuItem onClick={() => { openCategoryConfig(); setMenuAnchor(null); }}>
+                <BookOpen size={15} style={{ marginRight: 8 }} /> 경매 설정
+              </MenuItem>
+              <Divider />
+              {phase === 'WAITING' && (
+                <MenuItem
+                  sx={{ color: 'error.main' }}
+                  onClick={() => { if (confirm('전체 경매를 초기화하시겠습니까?')) { socket.emit('resetGame'); setMenuAnchor(null); } }}
+                >
+                  <RefreshCw size={15} style={{ marginRight: 8 }} /> 전체 초기화
+                </MenuItem>
+              )}
+              <MenuItem sx={{ color: 'text.secondary' }} onClick={() => { setMenuAnchor(null); onLogout(); }}>
+                <LogOut size={15} style={{ marginRight: 8 }} /> 로그아웃
+              </MenuItem>
+            </Menu>
+          </Box>
+        </Toolbar>
+      </AppBar>
 
       {/* ── Main layout ── */}
-      <div style={{ display: 'flex', gap: '1.25rem', padding: '1.25rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      <Box sx={{ display: 'flex', gap: 2.5, p: 2.5, alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
         {/* ── Left: Team sidebar ── */}
-        <div style={{ width: '100%', maxWidth: '280px', display: 'flex', flexDirection: 'column', gap: '0.75rem', position: 'sticky', top: '72px', flex: '0 0 280px' }}>
+        <Box sx={{ width: '100%', maxWidth: '280px', display: 'flex', flexDirection: 'column', gap: 1.25, position: 'sticky', top: '72px', flex: '0 0 280px' }}>
 
           {/* Guess winner banner */}
           {gameState.lastGuessWinners?.teams?.length > 0 && (
-            <div style={{ padding: '0.85rem', background: 'var(--emerald-dim)', border: '1px solid rgba(52,211,153,0.3)', borderRadius: 'var(--radius-md)' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--emerald)', marginBottom: '0.4rem' }}>🎯 낙찰가 예측 보너스</div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-2)' }}>오차 {gameState.lastGuessWinners.minDiff}코인</div>
-              <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+            <Box sx={{ p: 1.25, background: 'var(--emerald-dim)', border: '1px solid rgba(52,211,153,0.3)', borderRadius: 2 }}>
+              <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--emerald)', mb: 0.5 }}>🎯 낙찰가 예측 보너스</Typography>
+              <Typography sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>오차 {gameState.lastGuessWinners.minDiff}코인</Typography>
+              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
                 {gameState.lastGuessWinners.teams.map(tId => {
                   const t = gameState.teams.find(t => t.id === tId);
-                  return <span key={tId} style={{ padding: '0.15rem 0.5rem', background: 'rgba(52,211,153,0.2)', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', color: 'var(--emerald)' }}>{t?.name}</span>;
+                  return <Chip key={tId} label={t?.name} size="small" sx={{ background: 'rgba(52,211,153,0.2)', color: 'var(--emerald)', height: 22, fontSize: '0.75rem' }} />;
                 })}
-              </div>
-            </div>
+              </Box>
+            </Box>
           )}
 
           {/* Teams header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 0.2rem' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>모둠 현황</span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-3)' }}>{gameState.teams.length}팀</span>
-          </div>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 0.25 }}>
+            <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'text.secondary', letterSpacing: '0.05em', textTransform: 'uppercase' }}>모둠 현황</Typography>
+            <Typography sx={{ fontSize: '0.75rem', color: 'text.disabled' }}>{gameState.teams.length}팀</Typography>
+          </Box>
 
           {/* Team cards */}
           {gameState.teams.map(team => {
@@ -360,419 +373,406 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
             }).filter(e => e.item);
 
             return (
-              <div key={team.id} style={S.teamCard(connected)}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: connected ? 'var(--emerald)' : 'var(--text-3)', flexShrink: 0, boxShadow: connected ? '0 0 6px var(--emerald)' : 'none' }} />
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{team.name}</span>
-                  </div>
-                  <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: '0.85rem', fontWeight: 700, color: 'var(--amber)', flexShrink: 0 }}>{team.budget}</span>
-                </div>
+              <Box key={team.id} sx={teamCardSx(connected)}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
+                    <Box sx={{ width: 7, height: 7, borderRadius: '50%', background: connected ? 'var(--emerald)' : 'var(--text-3)', flexShrink: 0, boxShadow: connected ? '0 0 6px var(--emerald)' : 'none' }} />
+                    <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{team.name}</Typography>
+                  </Box>
+                  <Typography sx={{ fontFamily: 'JetBrains Mono,monospace', fontSize: '0.85rem', fontWeight: 700, color: 'secondary.main', flexShrink: 0 }}>{team.budget}</Typography>
+                </Box>
 
                 {team.studentInfo && (
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-3)' }}>{team.studentInfo.grade}학년 {team.studentInfo.classNum}반 · {team.studentInfo.members}</div>
+                  <Typography sx={{ fontSize: '0.72rem', color: 'text.disabled' }}>{team.studentInfo.grade}학년 {team.studentInfo.classNum}반 · {team.studentInfo.members}</Typography>
                 )}
 
-                {/* Bid status */}
                 {(phase === 'BIDDING' || phase === 'REBIDDING') && hasBid && (
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.5rem', background: hasBid.isGuess ? 'var(--sky-dim)' : 'var(--emerald-dim)', borderRadius: 'var(--radius-full)', fontSize: '0.72rem', fontWeight: 700, color: hasBid.isGuess ? 'var(--sky)' : 'var(--emerald)', alignSelf: 'flex-start' }}>
-                    <Check size={10} /> {hasBid.isGuess ? '예측 완료' : '제출 완료'}
-                  </div>
+                  <Chip
+                    icon={<Check size={10} />}
+                    label={hasBid.isGuess ? '예측 완료' : '제출 완료'}
+                    size="small"
+                    sx={{
+                      alignSelf: 'flex-start', height: 22, fontSize: '0.72rem', fontWeight: 700,
+                      background: hasBid.isGuess ? 'var(--violet-light-dim)' : 'var(--emerald-dim)',
+                      color: hasBid.isGuess ? 'var(--violet-light)' : 'var(--emerald)',
+                      '& .MuiChip-icon': { color: 'inherit' },
+                    }}
+                  />
                 )}
 
-                {/* Rebid 1차 금액 */}
                 {phase === 'REBIDDING' && initialBids?.[team.id] !== undefined && (
-                  <div style={{ fontSize: '0.8rem', fontFamily: 'JetBrains Mono,monospace' }}>
+                  <Typography sx={{ fontSize: '0.8rem', fontFamily: 'JetBrains Mono,monospace' }}>
                     {isProjectorMode
-                      ? <span className="mask-hover" style={{ background: 'rgba(255,255,255,0.05)', padding: '0 0.4rem', borderRadius: 4, cursor: 'help' }}>{initialBids[team.id]}</span>
-                      : <span style={{ color: 'var(--sky)' }}>{initialBids[team.id]} (1차)</span>}
-                  </div>
+                      ? <Box component="span" className="mask-hover" sx={{ background: 'rgba(255,255,255,0.05)', px: 0.5, borderRadius: 0.5, cursor: 'help' }}>{initialBids[team.id]}</Box>
+                      : <Box component="span" sx={{ color: 'var(--violet-light)' }}>{initialBids[team.id]} (1차)</Box>}
+                  </Typography>
                 )}
 
-                {/* Revealing bids */}
                 {phase === 'REVEALING' && gameState.bids[team.id] !== undefined && (
-                  <div className="anim-stamp" style={{ fontFamily: 'JetBrains Mono,monospace', fontWeight: 800, fontSize: '1.1rem', color: 'var(--amber)' }}>
+                  <Typography className="anim-stamp" sx={{ fontFamily: 'JetBrains Mono,monospace', fontWeight: 800, fontSize: '1.1rem', color: 'secondary.main' }}>
                     {gameState.bids[team.id]}
-                  </div>
+                  </Typography>
                 )}
 
-                {/* Won items */}
                 {wonList.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingTop: '0.3rem', borderTop: '1px solid var(--border-subtle)' }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, pt: 0.5, borderTop: '1px solid var(--border-subtle)' }}>
                     {wonList.map(({ cat, ci, item }) => (
-                      <div key={cat.id} style={{ fontSize: '0.72rem', display: 'flex', justifyContent: 'space-between', gap: '0.25rem' }}>
-                        <span style={{ color: getCatColor(ci), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
-                        <span style={{ color: 'var(--text-3)', flexShrink: 0, fontFamily: 'JetBrains Mono,monospace' }}>{item.winningBid}</span>
-                      </div>
+                      <Box key={cat.id} sx={{ fontSize: '0.72rem', display: 'flex', justifyContent: 'space-between', gap: 0.5 }}>
+                        <Typography sx={{ fontSize: '0.72rem', color: getCatColor(ci), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</Typography>
+                        <Typography sx={{ fontSize: '0.72rem', color: 'text.disabled', flexShrink: 0, fontFamily: 'JetBrains Mono,monospace' }}>{item.winningBid}</Typography>
+                      </Box>
                     ))}
-                  </div>
+                  </Box>
                 )}
-              </div>
+              </Box>
             );
           })}
-        </div>
+        </Box>
 
         {/* ── Right: Auction board ── */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
           <AuctionBoard
             gameState={gameState}
             selectedItemId={gameState.currentAuctionItemId || selectedItemId}
             onSelectItem={setSelectedItemId}
             isTeacher={true}
           />
-        </div>
-      </div>
+        </Box>
+      </Box>
 
-      {/* ══════════════════════════════════════════════════════ */}
-      {/* Category Wrap-Up Modal */}
+      {/* ══ Category Wrap-Up Modal ══ */}
       {phase === 'CATEGORY_WRAP_UP' && gameState.categoryWrapUp && (() => {
         const wu = gameState.categoryWrapUp;
-        const teamsWithoutWin = wu.teamsWithoutWin
-          .map(id => gameState.teams.find(t => t.id === id))
-          .filter(Boolean);
+        const teamsWithoutWin = wu.teamsWithoutWin.map(id => gameState.teams.find(t => t.id === id)).filter(Boolean);
         const unsoldCount = wu.unsoldItems?.length || 0;
         const canAssign = unsoldCount > 0;
 
-        const wrapBtnBase = {
-          flex: 1, padding: '0.85rem 1rem',
-          border: '1px solid', borderRadius: 'var(--radius-md)',
-          cursor: 'pointer', fontFamily: 'Inter,sans-serif',
-          fontSize: '0.875rem', fontWeight: 700,
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem',
-          transition: 'all 0.15s', lineHeight: 1.4,
-        };
-
         return (
-          <div style={{ ...S.modal, alignItems: 'center' }}>
-            <div style={{ ...S.modalBox, maxWidth: '520px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '1.3rem' }}>📋</span>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--sky)', letterSpacing: '-0.02em', margin: 0 }}>
-                  카테고리 마무리
-                </h2>
-              </div>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-2)', marginBottom: '1.25rem' }}>
+          <Dialog open maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pb: 0.5 }}>
+              <span>📋</span>
+              <Typography sx={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--violet-light)' }}>카테고리 마무리</Typography>
+            </DialogTitle>
+            <DialogContent>
+              <Typography sx={{ fontSize: '0.9rem', color: 'text.secondary', mb: 2 }}>
                 <strong style={{ color: 'var(--text-1)' }}>'{wu.categoryName}'</strong> 카테고리의 모든 항목이 진행되었습니다.
-              </p>
+              </Typography>
 
-              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: '160px', padding: '0.85rem', background: 'var(--rose-dim)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 'var(--radius-md)' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--rose)', marginBottom: '0.5rem', letterSpacing: '0.04em', textTransform: 'uppercase' }}>낙찰 미달 모둠 ({teamsWithoutWin.length})</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+              <Box sx={{ display: 'flex', gap: 1.5, mb: 2, flexWrap: 'wrap' }}>
+                <Box sx={{ flex: 1, minWidth: '160px', p: 1.25, background: 'var(--rose-dim)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 2 }}>
+                  <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'error.main', mb: 0.75, textTransform: 'uppercase', letterSpacing: '0.04em' }}>낙찰 미달 모둠 ({teamsWithoutWin.length})</Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                     {teamsWithoutWin.map(t => (
-                      <span key={t.id} style={{ padding: '0.2rem 0.55rem', background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 'var(--radius-full)', fontSize: '0.8rem', fontWeight: 700, color: 'var(--rose)' }}>
-                        {t.name}
-                      </span>
+                      <Chip key={t.id} label={t.name} size="small" sx={{ background: 'rgba(248,113,113,0.15)', color: 'error.main', border: '1px solid rgba(248,113,113,0.3)', height: 24, fontSize: '0.8rem', fontWeight: 700 }} />
                     ))}
-                  </div>
-                </div>
-                <div style={{ flex: '0 0 auto', padding: '0.85rem 1.25rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}>
-                  <div style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'JetBrains Mono,monospace', color: canAssign ? 'var(--amber)' : 'var(--text-3)' }}>{unsoldCount}</div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-2)' }}>유찰 항목</div>
-                </div>
-              </div>
+                  </Box>
+                </Box>
+                <Box sx={{ flexShrink: 0, p: '0.85rem 1.25rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-subtle)', borderRadius: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 0.25 }}>
+                  <Typography sx={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'JetBrains Mono,monospace', color: canAssign ? 'secondary.main' : 'text.disabled' }}>{unsoldCount}</Typography>
+                  <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary' }}>유찰 항목</Typography>
+                </Box>
+              </Box>
 
-              <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
-                <button
-                  style={{ ...wrapBtnBase, background: 'rgba(255,255,255,0.04)', borderColor: 'var(--border-strong)', color: 'var(--text-2)' }}
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Button
+                  fullWidth variant="outlined"
+                  sx={{ justifyContent: 'flex-start', gap: 1, p: 1.5, borderColor: 'var(--border-strong)', color: 'text.secondary' }}
                   onClick={() => socket.emit('categoryWrapUpAction', { action: 'end' })}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
                 >
                   <span style={{ fontSize: '1.3rem' }}>✋</span>
-                  <span>이대로 종료</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 400, color: 'var(--text-3)' }}>낙찰 없이 다음으로</span>
-                </button>
-
-                <button
-                  disabled={!canAssign}
-                  style={{ ...wrapBtnBase, background: canAssign ? 'var(--amber-dim)' : 'rgba(255,255,255,0.02)', borderColor: canAssign ? 'rgba(245,158,11,0.4)' : 'var(--border-subtle)', color: canAssign ? 'var(--amber)' : 'var(--text-3)', cursor: canAssign ? 'pointer' : 'not-allowed', opacity: canAssign ? 1 : 0.5 }}
+                  <Box sx={{ textAlign: 'left' }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '0.875rem' }}>이대로 종료</Typography>
+                    <Typography sx={{ fontSize: '0.72rem', color: 'text.disabled', fontWeight: 400 }}>낙찰 없이 다음으로</Typography>
+                  </Box>
+                </Button>
+                <Button
+                  fullWidth variant="outlined" disabled={!canAssign}
+                  sx={{ justifyContent: 'flex-start', gap: 1, p: 1.5, borderColor: canAssign ? 'rgba(245,158,11,0.4)' : undefined, color: canAssign ? 'secondary.main' : undefined }}
                   onClick={() => canAssign && socket.emit('categoryWrapUpAction', { action: 'random' })}
-                  onMouseEnter={e => { if (canAssign) e.currentTarget.style.background = 'rgba(245,158,11,0.2)'; }}
-                  onMouseLeave={e => { if (canAssign) e.currentTarget.style.background = 'var(--amber-dim)'; }}
                 >
                   <span style={{ fontSize: '1.3rem' }}>🎲</span>
-                  <span>무작위 배정</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 400, color: canAssign ? 'rgba(245,158,11,0.7)' : 'var(--text-3)' }}>유찰 항목을 랜덤으로</span>
-                </button>
-
-                <button
-                  disabled={!canAssign}
-                  style={{ ...wrapBtnBase, background: canAssign ? 'var(--violet-dim)' : 'rgba(255,255,255,0.02)', borderColor: canAssign ? 'rgba(124,106,255,0.4)' : 'var(--border-subtle)', color: canAssign ? 'var(--violet)' : 'var(--text-3)', cursor: canAssign ? 'pointer' : 'not-allowed', opacity: canAssign ? 1 : 0.5 }}
+                  <Box sx={{ textAlign: 'left' }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '0.875rem' }}>무작위 배정</Typography>
+                    <Typography sx={{ fontSize: '0.72rem', color: 'text.disabled', fontWeight: 400 }}>유찰 항목을 랜덤으로</Typography>
+                  </Box>
+                </Button>
+                <Button
+                  fullWidth variant="outlined" disabled={!canAssign}
+                  sx={{ justifyContent: 'flex-start', gap: 1, p: 1.5, borderColor: canAssign ? 'rgba(124,106,255,0.4)' : undefined, color: canAssign ? 'primary.main' : undefined }}
                   onClick={() => canAssign && socket.emit('categoryWrapUpAction', { action: 'consolation' })}
-                  onMouseEnter={e => { if (canAssign) e.currentTarget.style.background = 'rgba(124,106,255,0.2)'; }}
-                  onMouseLeave={e => { if (canAssign) e.currentTarget.style.background = 'var(--violet-dim)'; }}
                 >
                   <span style={{ fontSize: '1.3rem' }}>⚔️</span>
-                  <span>재경매 진행</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 400, color: canAssign ? 'rgba(124,106,255,0.7)' : 'var(--text-3)' }}>미달 모둠끼리 재경쟁</span>
-                </button>
-              </div>
-            </div>
-          </div>
+                  <Box sx={{ textAlign: 'left' }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '0.875rem' }}>재경매 진행</Typography>
+                    <Typography sx={{ fontSize: '0.72rem', color: 'text.disabled', fontWeight: 400 }}>미달 모둠끼리 재경쟁</Typography>
+                  </Box>
+                </Button>
+              </Box>
+            </DialogContent>
+          </Dialog>
         );
       })()}
 
-      {/* ══════════════════════════════════════════════════════ */}
-      {/* Result Report Modal */}
-      {showDashboard && (
-        <div style={S.modal}>
-          <div style={S.modalBox}>
-            <button onClick={() => setShowDashboard(false)} style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', color: 'var(--text-2)', cursor: 'pointer', padding: '0.35rem', display: 'flex' }}>
-              <X size={20} />
-            </button>
+      {/* ══ Result Report Modal ══ */}
+      <Dialog open={showDashboard} onClose={() => setShowDashboard(false)} maxWidth="lg" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ pb: 0.5 }}>
+          <Typography sx={{ fontWeight: 800, fontSize: '1.4rem', letterSpacing: '-0.03em' }}>
+            {gameState.classInfo ? `${gameState.classInfo.grade}학년 ${gameState.classInfo.classNum}반 ` : ''}경매 결과 리포트
+          </Typography>
+          <Typography sx={{ fontSize: '0.85rem', color: 'text.secondary', mt: 0.25 }}>최종 낙찰 및 예산 현황</Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Button
+            variant="outlined"
+            startIcon={<Download size={16} />}
+            onClick={handleExportExcel}
+            sx={{ mb: 2.5, borderColor: 'rgba(34,197,94,0.4)', color: '#4ade80', '&:hover': { background: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.7)' } }}
+          >
+            엑셀로 내보내기
+          </Button>
 
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-1)', marginBottom: '0.3rem', letterSpacing: '-0.03em' }}>
-              {gameState.classInfo ? `${gameState.classInfo.grade}학년 ${gameState.classInfo.classNum}반 ` : ''}경매 결과 리포트
-            </h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-2)', marginBottom: '1.5rem' }}>최종 낙찰 및 예산 현황</p>
+          <Grid container spacing={1.5}>
+            {gameState.teams.map(team => {
+              const wonEntries = categoryConfig.map((cat, ci) => {
+                const itemId = team.wonItems?.[cat.id];
+                return { cat, ci, item: itemId ? gameState.items.find(i => i.id === itemId) : null };
+              });
+              const totalSpent = wonEntries.reduce((s, e) => s + (e.item?.winningBid || 0), 0);
 
-            <button
-              onClick={handleExportExcel}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.55rem 1.1rem', background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.4)', borderRadius: 'var(--radius-md)', color: '#4ade80', cursor: 'pointer', fontFamily: 'Inter,sans-serif', fontSize: '0.875rem', fontWeight: 700, marginBottom: '1.5rem', transition: 'all 0.15s' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(34,197,94,0.25)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(34,197,94,0.15)'}
-            >
-              <Download size={16} /> 엑셀로 내보내기
-            </button>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-              {gameState.teams.map(team => {
-                const wonEntries = categoryConfig.map((cat, ci) => {
-                  const itemId = team.wonItems?.[cat.id];
-                  return { cat, ci, item: itemId ? gameState.items.find(i => i.id === itemId) : null };
-                });
-                const totalSpent = wonEntries.reduce((s, e) => s + (e.item?.winningBid || 0), 0);
-
-                return (
-                  <div key={team.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-1)' }}>{team.name}</div>
-                        {team.studentInfo && <div style={{ fontSize: '0.75rem', color: 'var(--text-2)', marginTop: '0.15rem' }}>{team.studentInfo.grade}학년 {team.studentInfo.classNum}반 · {team.studentInfo.members}</div>}
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <div style={{ flex: 1, textAlign: 'center', padding: '0.6rem', background: 'var(--amber-dim)', borderRadius: 'var(--radius-md)' }}>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-2)', marginBottom: '0.2rem' }}>남은 예산</div>
-                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--amber)', fontFamily: 'JetBrains Mono,monospace' }}>{team.budget}</div>
-                      </div>
-                      <div style={{ flex: 1, textAlign: 'center', padding: '0.6rem', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)' }}>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-2)', marginBottom: '0.2rem' }}>사용 금액</div>
-                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-1)', fontFamily: 'JetBrains Mono,monospace' }}>{totalSpent}</div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              return (
+                <Grid item key={team.id} xs={12} sm={6} md={4}>
+                  <Box sx={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: 2.5, p: 2, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box>
+                        <Typography sx={{ fontWeight: 800, fontSize: '1.1rem' }}>{team.name}</Typography>
+                        {team.studentInfo && <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', mt: 0.25 }}>{team.studentInfo.grade}학년 {team.studentInfo.classNum}반 · {team.studentInfo.members}</Typography>}
+                      </Box>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Box sx={{ flex: 1, textAlign: 'center', p: 1, background: 'var(--amber-dim)', borderRadius: 2 }}>
+                        <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', mb: 0.25 }}>남은 예산</Typography>
+                        <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: 'secondary.main', fontFamily: 'JetBrains Mono,monospace' }}>{team.budget}</Typography>
+                      </Box>
+                      <Box sx={{ flex: 1, textAlign: 'center', p: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
+                        <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', mb: 0.25 }}>사용 금액</Typography>
+                        <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, fontFamily: 'JetBrains Mono,monospace' }}>{totalSpent}</Typography>
+                      </Box>
+                    </Box>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                       {wonEntries.map(({ cat, ci, item }) => {
                         const col = getCatColor(ci);
                         return (
-                          <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.65rem', background: `rgba(${hexToRgb(col)},0.08)`, borderRadius: 'var(--radius-sm)', border: `1px solid rgba(${hexToRgb(col)},0.2)` }}>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: col, minWidth: '60px' }}>{cat.name}</span>
+                          <Box key={cat.id} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, p: '0.5rem 0.65rem', background: `rgba(${hexToRgb(col)},0.08)`, borderRadius: 1, border: `1px solid rgba(${hexToRgb(col)},0.2)` }}>
+                            <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: col, minWidth: '60px' }}>{cat.name}</Typography>
                             {item
-                              ? <><span style={{ flex: 1, fontSize: '0.8rem', color: 'var(--text-1)' }}>{item.name}</span><span style={{ fontSize: '0.75rem', color: col, fontFamily: 'JetBrains Mono,monospace' }}>{item.winningBid}</span></>
-                              : <span style={{ flex: 1, fontSize: '0.8rem', color: 'var(--text-3)' }}>기록 없음</span>}
-                          </div>
+                              ? <><Typography sx={{ flex: 1, fontSize: '0.8rem' }}>{item.name}</Typography><Typography sx={{ fontSize: '0.75rem', color: col, fontFamily: 'JetBrains Mono,monospace' }}>{item.winningBid}</Typography></>
+                              : <Typography sx={{ flex: 1, fontSize: '0.8rem', color: 'text.disabled' }}>기록 없음</Typography>}
+                          </Box>
                         );
                       })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+                    </Box>
+                  </Box>
+                </Grid>
+              );
+            })}
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDashboard(false)} variant="outlined" color="inherit">닫기</Button>
+        </DialogActions>
+      </Dialog>
 
-      {/* Team Management Modal */}
-      {showTeamMgmt && (
-        <div style={S.modal}>
-          <div style={{ ...S.modalBox, maxWidth: '620px' }}>
-            <button onClick={() => setShowTeamMgmt(false)} style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', color: 'var(--text-2)', cursor: 'pointer', padding: '0.35rem', display: 'flex' }}>
-              <X size={20} />
-            </button>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.25rem' }}>모둠 관리</h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-2)', marginBottom: '1.25rem' }}>학생 정보를 초기화하거나 모둠 수를 조정하세요.</p>
-            <button
-              onClick={() => socket.emit('addTeam')}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', background: 'var(--violet-dim)', border: '1px solid rgba(124,106,255,0.4)', borderRadius: 'var(--radius-md)', color: 'var(--violet)', cursor: 'pointer', fontFamily: 'Inter,sans-serif', fontSize: '0.85rem', fontWeight: 700, marginBottom: '1rem', transition: 'all 0.15s' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(124,106,255,0.25)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'var(--violet-dim)'}
-            >
-              <UserPlus size={15} /> 모둠 추가
-            </button>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {gameState.teams.map(team => (
-                <div key={team.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.85rem 1rem', background: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', gap: '0.75rem' }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{team.name}</div>
-                    {team.studentInfo
-                      ? <div style={{ fontSize: '0.78rem', color: 'var(--emerald)', marginTop: '0.1rem' }}>{team.studentInfo.grade}학년 {team.studentInfo.classNum}반 ({team.studentInfo.members})</div>
-                      : <div style={{ fontSize: '0.78rem', color: 'var(--text-3)', marginTop: '0.1rem' }}>미등록</div>}
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
-                    <button
-                      disabled={!team.studentInfo}
-                      onClick={() => { if (confirm(`${team.name} 정보를 초기화합니까?`)) socket.emit('resetTeamInfo', team.id); }}
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.7rem', background: 'transparent', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-sm)', color: team.studentInfo ? 'var(--text-1)' : 'var(--text-3)', cursor: team.studentInfo ? 'pointer' : 'not-allowed', fontSize: '0.8rem', fontFamily: 'Inter,sans-serif', opacity: team.studentInfo ? 1 : 0.5 }}
-                    >
-                      <RefreshCw size={13} /> 초기화
-                    </button>
-                    <button
-                      onClick={() => { if (confirm(`${team.name}을 삭제합니까?`)) socket.emit('removeTeam', team.id); }}
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.7rem', background: 'var(--rose-dim)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 'var(--radius-sm)', color: 'var(--rose)', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'Inter,sans-serif' }}
-                    >
-                      <Trash2 size={13} /> 삭제
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ══ Team Management Modal ══ */}
+      <Dialog open={showTeamMgmt} onClose={() => setShowTeamMgmt(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle>
+          <Typography sx={{ fontWeight: 800, fontSize: '1.3rem' }}>모둠 관리</Typography>
+          <Typography sx={{ fontSize: '0.85rem', color: 'text.secondary', mt: 0.25 }}>학생 정보를 초기화하거나 모둠 수를 조정하세요.</Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Button
+            variant="outlined" color="primary"
+            startIcon={<UserPlus size={15} />}
+            onClick={() => socket.emit('addTeam')}
+            sx={{ mb: 2 }}
+          >
+            모둠 추가
+          </Button>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {gameState.teams.map(team => (
+              <Box key={team.id} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: '0.85rem 1rem', background: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: 2, gap: 1.5 }}>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: '0.95rem' }}>{team.name}</Typography>
+                  {team.studentInfo
+                    ? <Typography sx={{ fontSize: '0.78rem', color: 'success.main', mt: 0.15 }}>{team.studentInfo.grade}학년 {team.studentInfo.classNum}반 ({team.studentInfo.members})</Typography>
+                    : <Typography sx={{ fontSize: '0.78rem', color: 'text.disabled', mt: 0.15 }}>미등록</Typography>}
+                </Box>
+                <Box sx={{ display: 'flex', gap: 0.75, flexShrink: 0 }}>
+                  <Button
+                    variant="outlined" size="small" color="inherit"
+                    disabled={!team.studentInfo}
+                    startIcon={<RefreshCw size={13} />}
+                    onClick={() => { if (confirm(`${team.name} 정보를 초기화합니까?`)) socket.emit('resetTeamInfo', team.id); }}
+                  >
+                    초기화
+                  </Button>
+                  <Button
+                    variant="outlined" size="small" color="error"
+                    startIcon={<Trash2 size={13} />}
+                    onClick={() => { if (confirm(`${team.name}을 삭제합니까?`)) socket.emit('removeTeam', team.id); }}
+                  >
+                    삭제
+                  </Button>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowTeamMgmt(false)} variant="outlined" color="inherit">닫기</Button>
+        </DialogActions>
+      </Dialog>
 
-      {/* Category Config Modal */}
+      {/* ══ Category Config Modal ══ */}
       {showCategoryConfig && editingConfig && (
-        <div style={S.modal}>
-          <div style={{ ...S.modalBox, maxWidth: '780px' }}>
-            <button onClick={() => setShowCategoryConfig(false)} style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', color: 'var(--text-2)', cursor: 'pointer', padding: '0.35rem', display: 'flex' }}>
-              <X size={20} />
-            </button>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.25rem' }}>경매 설정</h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--orange)', marginBottom: '1.25rem' }}>⚠️ 적용 시 현재 경매가 초기화됩니다.</p>
-
-            {/* 수업 라이브러리 */}
-            <div style={{ marginBottom: '1.5rem', padding: '1rem 1.25rem', background: 'rgba(124,106,255,0.05)', border: '1px solid rgba(124,106,255,0.2)', borderRadius: 'var(--radius-lg)' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--violet)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.75rem' }}>수업 라이브러리</div>
-
+        <Dialog open onClose={() => setShowCategoryConfig(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+          <DialogTitle>
+            <Typography sx={{ fontWeight: 800, fontSize: '1.3rem' }}>경매 설정</Typography>
+            <Typography sx={{ fontSize: '0.85rem', color: 'secondary.main', mt: 0.25 }}>⚠️ 적용 시 현재 경매가 초기화됩니다.</Typography>
+          </DialogTitle>
+          <DialogContent>
+            {/* Subject Library */}
+            <Box sx={{ mb: 3, p: 2, background: 'rgba(124,106,255,0.05)', border: '1px solid rgba(124,106,255,0.2)', borderRadius: 2.5 }}>
+              <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'primary.main', letterSpacing: '0.06em', textTransform: 'uppercase', mb: 1.25 }}>수업 라이브러리</Typography>
               {subjectsLoading ? (
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-3)', marginBottom: '0.75rem' }}>불러오는 중...</div>
+                <Typography sx={{ fontSize: '0.85rem', color: 'text.disabled', mb: 1.25 }}>불러오는 중...</Typography>
               ) : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.25 }}>
                   {savedSubjects.map(s => (
-                    <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.5rem 0.3rem 0.75rem', background: s.builtin ? 'rgba(124,106,255,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${s.builtin ? 'rgba(124,106,255,0.4)' : 'var(--border-default)'}`, borderRadius: 'var(--radius-full)' }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: s.builtin ? 700 : 400, color: s.builtin ? 'var(--violet)' : 'var(--text-1)' }}>{s.name}</span>
-                      {s.builtin && <span style={{ fontSize: '0.68rem', color: 'var(--violet)', opacity: 0.65, marginRight: '0.1rem' }}>기본</span>}
-                      <button
-                        onClick={() => handleLoadSubject(s)}
-                        style={{ padding: '0.15rem 0.45rem', background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.35)', borderRadius: 'var(--radius-sm)', color: 'var(--emerald)', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700, fontFamily: 'Inter,sans-serif' }}
-                      >불러오기</button>
+                    <Box key={s.id} sx={{ display: 'flex', alignItems: 'center', gap: 0.5, p: '0.3rem 0.5rem 0.3rem 0.75rem', background: s.builtin ? 'rgba(124,106,255,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${s.builtin ? 'rgba(124,106,255,0.4)' : 'var(--border-default)'}`, borderRadius: 99 }}>
+                      <Typography sx={{ fontSize: '0.82rem', fontWeight: s.builtin ? 700 : 400, color: s.builtin ? 'primary.main' : 'text.primary' }}>{s.name}</Typography>
+                      {s.builtin && <Typography sx={{ fontSize: '0.68rem', color: 'primary.main', opacity: 0.65 }}>기본</Typography>}
+                      <Button size="small" variant="outlined" color="success" onClick={() => handleLoadSubject(s)}
+                        sx={{ py: 0.25, px: 0.75, fontSize: '0.72rem', minHeight: 0, height: 24 }}>불러오기</Button>
                       {!s.builtin && (
-                        <button
-                          onClick={() => handleDeleteSubject(s.id, s.name)}
-                          style={{ padding: '0.15rem', background: 'transparent', border: 'none', color: 'var(--text-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', lineHeight: 1 }}
-                        ><X size={12} /></button>
+                        <IconButton size="small" onClick={() => handleDeleteSubject(s.id, s.name)} sx={{ p: 0.25, color: 'text.disabled' }}>
+                          <X size={12} />
+                        </IconButton>
                       )}
-                    </div>
+                    </Box>
                   ))}
-                </div>
+                </Box>
               )}
-
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.75rem' }}>
-                <input
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', borderTop: '1px solid var(--border-subtle)', pt: 1.25 }}>
+                <TextField
+                  size="small" fullWidth
                   value={subjectSaveName}
                   onChange={e => setSubjectSaveName(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleSaveSubject()}
                   placeholder="현재 설정을 이름 붙여 저장..."
-                  style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-sm)', color: 'var(--text-1)', padding: '0.4rem 0.75rem', fontFamily: 'Inter,sans-serif', fontSize: '0.875rem', outline: 'none' }}
                 />
-                <button
-                  onClick={handleSaveSubject}
-                  style={{ padding: '0.4rem 0.9rem', background: 'var(--violet-dim)', border: '1px solid rgba(124,106,255,0.4)', borderRadius: 'var(--radius-sm)', color: 'var(--violet)', cursor: 'pointer', fontFamily: 'Inter,sans-serif', fontSize: '0.82rem', fontWeight: 700, whiteSpace: 'nowrap' }}
-                >저장</button>
-              </div>
-            </div>
+                <Button variant="outlined" color="primary" onClick={handleSaveSubject} sx={{ whiteSpace: 'nowrap' }}>저장</Button>
+              </Box>
+            </Box>
 
             {/* Game Rules */}
             {editingGameConfig && (
-              <div style={{ marginBottom: '1.5rem', padding: '1rem 1.25rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '1rem' }}>게임 규칙</div>
-                <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1, minWidth: '160px' }}>
-                    <span style={{ fontSize: '0.82rem', color: 'var(--text-2)', fontWeight: 600 }}>모둠 초기 코인</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <input
-                        type="number" min="100" max="99999" step="50"
+              <Box sx={{ mb: 3, p: 2, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-default)', borderRadius: 2.5 }}>
+                <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.06em', mb: 1.5 }}>게임 규칙</Typography>
+                <Box sx={{ display: 'flex', gap: 2.5, flexWrap: 'wrap' }}>
+                  <Box sx={{ flex: 1, minWidth: '160px' }}>
+                    <Typography sx={{ fontSize: '0.82rem', color: 'text.secondary', fontWeight: 600, mb: 0.75 }}>모둠 초기 코인</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <TextField
+                        type="number" size="small"
+                        inputProps={{ min: 100, max: 99999, step: 50 }}
                         value={editingGameConfig.initialBudget}
                         onChange={e => setEditingGameConfig(g => ({ ...g, initialBudget: parseInt(e.target.value, 10) || g.initialBudget }))}
-                        style={{ width: '100px', background: 'rgba(0,0,0,0.35)', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-sm)', color: 'var(--text-1)', padding: '0.4rem 0.6rem', fontFamily: 'JetBrains Mono,monospace', fontSize: '1rem', fontWeight: 700, outline: 'none', textAlign: 'right' }}
+                        sx={{ width: 120, '& input': { fontFamily: 'JetBrains Mono,monospace', fontWeight: 700, textAlign: 'right' } }}
                       />
-                      <span style={{ fontSize: '0.82rem', color: 'var(--text-3)' }}>코인</span>
-                    </div>
-                  </label>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1, minWidth: '160px' }}>
-                    <span style={{ fontSize: '0.82rem', color: 'var(--text-2)', fontWeight: 600 }}>최소 입찰 단위</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <select
+                      <Typography sx={{ fontSize: '0.82rem', color: 'text.disabled' }}>코인</Typography>
+                    </Box>
+                  </Box>
+                  <Box sx={{ flex: 1, minWidth: '160px' }}>
+                    <Typography sx={{ fontSize: '0.82rem', color: 'text.secondary', fontWeight: 600, mb: 0.75 }}>최소 입찰 단위</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <TextField
+                        select size="small"
                         value={editingGameConfig.bidUnit}
                         onChange={e => setEditingGameConfig(g => ({ ...g, bidUnit: parseInt(e.target.value, 10) }))}
-                        style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-sm)', color: 'var(--text-1)', padding: '0.4rem 0.6rem', fontFamily: 'JetBrains Mono,monospace', fontSize: '1rem', fontWeight: 700, outline: 'none', cursor: 'pointer' }}
+                        SelectProps={{ native: true }}
+                        sx={{ '& select': { fontFamily: 'JetBrains Mono,monospace', fontWeight: 700 } }}
                       >
                         {[10, 25, 50, 100, 200].map(v => <option key={v} value={v}>{v}</option>)}
-                      </select>
-                      <span style={{ fontSize: '0.82rem', color: 'var(--text-3)' }}>코인 단위</span>
-                    </div>
-                  </label>
-                </div>
-              </div>
+                      </TextField>
+                      <Typography sx={{ fontSize: '0.82rem', color: 'text.disabled' }}>코인 단위</Typography>
+                    </Box>
+                  </Box>
+                </Box>
+              </Box>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+            {/* Categories */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 3 }}>
               {editingConfig.map((cat, ci) => {
                 const col = getCatColor(ci);
                 return (
-                  <div key={cat.id} style={{ border: `1px solid rgba(${hexToRgb(col)},0.3)`, borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-                    <div style={{ padding: '0.75rem 1rem', background: `rgba(${hexToRgb(col)},0.1)`, display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: col, minWidth: '60px' }}>카테고리 {ci + 1}</span>
-                      <input
-                        value={cat.name} onChange={e => { const n = [...editingConfig]; n[ci] = { ...n[ci], name: e.target.value }; setEditingConfig(n); }}
-                        style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: `1px solid rgba(${hexToRgb(col)},0.4)`, borderRadius: 'var(--radius-sm)', color: 'var(--text-1)', padding: '0.4rem 0.75rem', fontFamily: 'Inter,sans-serif', fontSize: '0.9rem', fontWeight: 700, outline: 'none' }}
+                  <Box key={cat.id} sx={{ border: `1px solid rgba(${hexToRgb(col)},0.3)`, borderRadius: 2.5, overflow: 'hidden' }}>
+                    <Box sx={{ px: 2, py: 1.25, background: `rgba(${hexToRgb(col)},0.1)`, display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                      <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: col, minWidth: '60px' }}>카테고리 {ci + 1}</Typography>
+                      <TextField
+                        size="small" fullWidth
+                        value={cat.name}
+                        onChange={e => { const n = [...editingConfig]; n[ci] = { ...n[ci], name: e.target.value }; setEditingConfig(n); }}
                         placeholder="카테고리 이름"
+                        sx={{ '& input': { fontWeight: 700 } }}
                       />
-                      <button onClick={() => { if (editingConfig.length <= 1) { alert('최소 1개 필요'); return; } setEditingConfig(editingConfig.filter((_,i) => i !== ci)); }}
-                        style={{ background: 'transparent', border: 'none', color: 'var(--rose)', cursor: 'pointer', padding: '0.2rem', display: 'flex' }}>
+                      <IconButton size="small" onClick={() => { if (editingConfig.length <= 1) { alert('최소 1개 필요'); return; } setEditingConfig(editingConfig.filter((_,i) => i !== ci)); }} sx={{ color: 'error.main' }}>
                         <Trash2 size={16} />
-                      </button>
-                    </div>
-                    <div style={{ padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      </IconButton>
+                    </Box>
+                    <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                       {cat.items.map((item, ii) => (
-                        <div key={ii} style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-3)', minWidth: '20px', textAlign: 'right' }}>{ii + 1}.</span>
-                          <input
-                            value={item} onChange={e => { const n = [...editingConfig]; const its = [...n[ci].items]; its[ii] = e.target.value; n[ci] = { ...n[ci], items: its }; setEditingConfig(n); }}
-                            style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-sm)', color: 'var(--text-1)', padding: '0.4rem 0.75rem', fontFamily: 'Inter,sans-serif', fontSize: '0.875rem', outline: 'none' }}
+                        <Box key={ii} sx={{ display: 'flex', gap: 0.75, alignItems: 'center' }}>
+                          <Typography sx={{ fontSize: '0.75rem', color: 'text.disabled', minWidth: '20px', textAlign: 'right' }}>{ii + 1}.</Typography>
+                          <TextField
+                            size="small" fullWidth
+                            value={item}
+                            onChange={e => { const n = [...editingConfig]; const its = [...n[ci].items]; its[ii] = e.target.value; n[ci] = { ...n[ci], items: its }; setEditingConfig(n); }}
                             placeholder="항목 내용"
                           />
-                          <button onClick={() => { if (cat.items.length <= 1) { alert('최소 1개 필요'); return; } const n = [...editingConfig]; n[ci] = { ...n[ci], items: n[ci].items.filter((_,i) => i !== ii) }; setEditingConfig(n); }}
-                            style={{ background: 'transparent', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '0.2rem', display: 'flex' }}>
+                          <IconButton size="small" onClick={() => { if (cat.items.length <= 1) { alert('최소 1개 필요'); return; } const n = [...editingConfig]; n[ci] = { ...n[ci], items: n[ci].items.filter((_,i) => i !== ii) }; setEditingConfig(n); }} sx={{ color: 'text.disabled' }}>
                             <X size={14} />
-                          </button>
-                        </div>
+                          </IconButton>
+                        </Box>
                       ))}
-                      <button onClick={() => { const n = [...editingConfig]; n[ci] = { ...n[ci], items: [...n[ci].items, ''] }; setEditingConfig(n); }}
-                        style={{ background: 'transparent', border: `1px dashed rgba(${hexToRgb(col)},0.4)`, borderRadius: 'var(--radius-sm)', color: col, padding: '0.4rem', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'Inter,sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', marginTop: '0.2rem' }}>
-                        <PlusCircle size={13} /> 항목 추가
-                      </button>
-                    </div>
-                  </div>
+                      <Button
+                        variant="outlined" size="small" fullWidth
+                        startIcon={<PlusCircle size={13} />}
+                        onClick={() => { const n = [...editingConfig]; n[ci] = { ...n[ci], items: [...n[ci].items, ''] }; setEditingConfig(n); }}
+                        sx={{ borderStyle: 'dashed', borderColor: `rgba(${hexToRgb(col)},0.4)`, color: col, mt: 0.25 }}
+                      >
+                        항목 추가
+                      </Button>
+                    </Box>
+                  </Box>
                 );
               })}
-              <button
+              <Button
+                variant="outlined" fullWidth
+                startIcon={<PlusCircle size={15} />}
                 onClick={() => setEditingConfig([...editingConfig, { id: `cat_${Date.now()}`, name: '새 카테고리', items: [''] }])}
-                style={{ background: 'transparent', border: '1px dashed var(--border-strong)', borderRadius: 'var(--radius-lg)', color: 'var(--text-2)', padding: '0.75rem', cursor: 'pointer', fontFamily: 'Inter,sans-serif', fontSize: '0.875rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
-                <PlusCircle size={15} /> 카테고리 추가
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowCategoryConfig(false)} style={{ padding: '0.6rem 1.25rem', background: 'transparent', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', color: 'var(--text-2)', cursor: 'pointer', fontFamily: 'Inter,sans-serif', fontSize: '0.9rem' }}>취소</button>
-              <button onClick={handleApplyCategoryConfig} style={{ padding: '0.6rem 1.5rem', background: 'var(--amber)', border: 'none', borderRadius: 'var(--radius-md)', color: '#1a1000', cursor: 'pointer', fontFamily: 'Inter,sans-serif', fontSize: '0.9rem', fontWeight: 700 }}>적용하기</button>
-            </div>
-          </div>
-        </div>
+                sx={{ borderStyle: 'dashed', borderColor: 'var(--border-strong)', color: 'text.secondary' }}
+              >
+                카테고리 추가
+              </Button>
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+            <Button onClick={() => setShowCategoryConfig(false)} variant="outlined" color="inherit">취소</Button>
+            <Button onClick={handleApplyCategoryConfig} variant="contained" color="secondary">적용하기</Button>
+          </DialogActions>
+        </Dialog>
       )}
-    </div>
+    </Box>
   );
 }

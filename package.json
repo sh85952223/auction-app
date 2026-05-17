@@ -11,6 +11,9 @@
     "start": "node server/index.js"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/material": "^9.0.1",
     "classnames": "^2.5.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",

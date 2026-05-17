@@ -1,6 +1,6 @@
 # Auction App — 개발 Handoff 문서
 
-> 마지막 업데이트: 2026-04-26 (세션 2)
+> 마지막 업데이트: 2026-05-17 (세션 3)
 > 대상 브랜치: `main` (origin보다 7 커밋 앞)
 
 ---
@@ -241,3 +241,46 @@ cd auction-app && npm run dev   # Vite :5173
 ## 미처리 항목
 
 위 설계 질문 외 없음.
+
+---
+
+## 세션 3 변경사항 (2026-05-17)
+
+### MUI 디자인 시스템 도입 + 3색 통일
+
+**목표:** 기존 CSS 변수 + 인라인 스타일 혼용 → MUI 기반 단일 디자인 시스템으로 관리.  
+색상을 6가지(violet/amber/sky/emerald/rose/orange)에서 3가지 브랜드 색으로 축소.
+
+#### 설치 패키지
+```
+@mui/material @emotion/react @emotion/styled
+```
+
+#### 3색 팔레트
+
+| 역할 | 변수/토큰 | 색상 | 용도 |
+|------|-----------|------|------|
+| Primary | `primary.main` / `--violet` | `#7c6aff` | 주요 버튼, 브랜드 색 |
+| Secondary | `secondary.main` / `--amber` | `#f59e0b` | 코인·예산·낙찰 강조 |
+| Error | `error.main` / `--rose` | `#f87171` | 위험·오류·삭제 |
+| *(semantic only)* | `success.main` / `--emerald` | `#34d399` | 접속 온라인 상태 점(dot)에만 사용 |
+
+- **sky(`#38bdf8`) 제거** → `--sky` 변수를 `#a599ff`(violet-light)으로 리맵. 기존 컴포넌트 호환 유지.
+- **orange(`#fb923c`) 제거** → `--orange` 변수를 amber로 리맵.
+
+#### 변경 파일 목록
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `src/theme.js` *(신규)* | MUI `createTheme` — 다크 팔레트, Inter 폰트, Button/Input/Paper 컴포넌트 오버라이드 |
+| `src/main.jsx` | `ThemeProvider` + `CssBaseline` 래핑 |
+| `src/index.css` | CSS 변수 3색으로 정리. sky/orange 호환 alias 추가. body background 중복 제거 |
+| `src/components/Lobby.jsx` | MUI `Box`, `Paper`, `Button`, `TextField`, `ButtonBase`, `Typography`, `Stack`으로 완전 재작성 |
+| `src/components/AuctionBoard.jsx` | `CAT_COLORS` — 6가지 외부 색상 → primary/secondary/error 3색 변형(main+light) 6슬롯 |
+| `src/components/TeacherView.jsx` | `CAT_COLORS` 업데이트. sky/orange → violet-light/amber 참조 전수 교체 |
+| `src/components/StudentView.jsx` | sky → violet-light 참조 전수 교체. GUESS 탭 버튼 text 색상 수정 |
+
+#### 미완료 (다음 세션)
+- **TeacherView / StudentView / AuctionBoard** 컴포넌트 내 인라인 스타일 → MUI `sx` prop 마이그레이션 미완료.  
+  색상 참조는 3색으로 통일됐으나, 컴포넌트 구조는 여전히 인라인 스타일 혼용 상태.
+- 추천 순서: TeacherView 헤더·모달 → StudentView 입찰 패널 → AuctionBoard 카드 순서로 단계 마이그레이션.

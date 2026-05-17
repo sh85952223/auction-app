@@ -1,146 +1,61 @@
 import { useState } from 'react';
+import {
+  Box, Paper, Button, TextField, Typography, Stack,
+  ButtonBase,
+} from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { Gavel, Users, ChevronLeft, Hash, ArrowRight } from 'lucide-react';
 
-const S = {
-  page: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '1.5rem',
-    background: 'var(--bg-base)',
-  },
-  wrap: {
-    width: '100%',
-    maxWidth: '440px',
-  },
-  header: {
-    textAlign: 'center',
-    marginBottom: '2rem',
-  },
-  logoRing: {
-    width: '64px',
-    height: '64px',
-    borderRadius: '50%',
-    background: 'var(--violet-dim)',
-    border: '1px solid rgba(124,106,255,0.4)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: '0 auto 1rem',
-  },
-  title: {
-    fontSize: '1.5rem',
-    fontWeight: '800',
-    color: 'var(--text-1)',
-    margin: '0 0 0.3rem 0',
-    letterSpacing: '-0.03em',
-  },
-  subtitle: {
-    fontSize: '0.875rem',
-    color: 'var(--text-2)',
-    margin: 0,
-  },
-  card: {
-    background: 'var(--bg-card)',
-    border: '1px solid var(--border-default)',
-    borderRadius: 'var(--radius-xl)',
-    padding: '2rem',
-    boxShadow: 'var(--shadow-lg)',
-  },
-  sectionTitle: {
-    fontSize: '1rem',
-    fontWeight: '700',
-    color: 'var(--text-1)',
-    marginBottom: '1.25rem',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-  },
-  roleCard: (active) => ({
-    width: '100%',
-    padding: '1.25rem 1rem',
-    background: active ? 'var(--violet-dim)' : 'rgba(255,255,255,0.03)',
-    border: `1px solid ${active ? 'rgba(124,106,255,0.5)' : 'var(--border-default)'}`,
-    borderRadius: 'var(--radius-lg)',
-    cursor: 'pointer',
-    transition: 'all 0.18s',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '1rem',
-    textAlign: 'left',
-    color: 'var(--text-1)',
-    fontFamily: 'Inter, sans-serif',
-  }),
-  roleIcon: (color) => ({
-    width: '44px',
-    height: '44px',
-    borderRadius: 'var(--radius-md)',
-    background: `rgba(${color},0.15)`,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  }),
-  fieldGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.25rem',
-    marginBottom: '0.75rem',
-  },
-  label: {
-    fontSize: '0.75rem',
-    fontWeight: '600',
-    letterSpacing: '0.05em',
-    textTransform: 'uppercase',
-    color: 'var(--text-2)',
-  },
-  row: {
-    display: 'flex',
-    gap: '0.5rem',
-  },
-  backBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '0.3rem',
-    background: 'none',
-    border: 'none',
-    color: 'var(--text-2)',
-    fontSize: '0.875rem',
-    cursor: 'pointer',
-    padding: '0.25rem 0',
-    marginBottom: '1.25rem',
-    fontFamily: 'Inter, sans-serif',
-    transition: 'color 0.15s',
-  },
-  codeWrap: {
-    position: 'relative',
-    marginBottom: '0.5rem',
-  },
-  errorText: {
-    fontSize: '0.825rem',
-    color: 'var(--rose)',
-    marginTop: '0.4rem',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.3rem',
-  },
-  teamBtn: (connected) => ({
-    padding: '0.85rem 0.75rem',
-    background: connected ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)',
-    border: `1px solid ${connected ? 'var(--border-subtle)' : 'var(--border-default)'}`,
-    borderRadius: 'var(--radius-md)',
-    cursor: connected ? 'not-allowed' : 'pointer',
-    color: connected ? 'var(--text-3)' : 'var(--text-1)',
-    fontFamily: 'Inter, sans-serif',
-    fontSize: '0.95rem',
-    fontWeight: '600',
-    transition: 'all 0.15s',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  }),
-};
+function RoleCard({ onClick, icon, title, desc }) {
+  return (
+    <ButtonBase
+      onClick={onClick}
+      sx={{
+        width: '100%',
+        p: '1.25rem 1rem',
+        bgcolor: 'rgba(255,255,255,0.03)',
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 2,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 2,
+        textAlign: 'left',
+        transition: 'all 0.18s',
+        '&:hover': {
+          borderColor: 'primary.main',
+          bgcolor: (t) => alpha(t.palette.primary.main, 0.1),
+        },
+      }}
+    >
+      <Box sx={{
+        width: 44, height: 44, borderRadius: 1.5,
+        bgcolor: (t) => alpha(t.palette.primary.main, 0.15),
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0,
+      }}>
+        {icon}
+      </Box>
+      <Box sx={{ flex: 1 }}>
+        <Typography fontWeight={700} sx={{ mb: 0.25 }}>{title}</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>{desc}</Typography>
+      </Box>
+      <ArrowRight size={18} color="#4a4b60" />
+    </ButtonBase>
+  );
+}
+
+function FieldLabel({ children }) {
+  return (
+    <Typography
+      variant="caption"
+      color="text.secondary"
+      sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', mb: 0.5 }}
+    >
+      {children}
+    </Typography>
+  );
+}
 
 export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTeams, showTeacherMode }) {
   const [step, setStep] = useState(showTeacherMode ? 'ROLE' : 'SESSION_CODE');
@@ -178,171 +93,233 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTea
     onJoin('team', selectedTeam.id, { grade, classNum, members: validMembers }, null, sessionCode.trim().toUpperCase());
   };
 
-  return (
-    <div style={S.page}>
-      <div style={S.wrap}>
-        {/* Logo */}
-        <div style={S.header}>
-          <div style={S.logoRing}>
-            <Gavel size={28} color="var(--violet)" strokeWidth={2.5} />
-          </div>
-          <h1 style={S.title}>가족문화 경매소</h1>
-          <p style={S.subtitle}>역할극 기반 실시간 경매 플랫폼</p>
-        </div>
+  const BackBtn = ({ onClick, label = '뒤로' }) => (
+    <Button
+      startIcon={<ChevronLeft size={16} />}
+      onClick={onClick}
+      color="inherit"
+      size="small"
+      sx={{
+        color: 'text.secondary', mb: 2, pl: 0.5,
+        '&:hover': { bgcolor: 'transparent', color: 'text.primary' },
+      }}
+    >
+      {label}
+    </Button>
+  );
 
-        <div style={S.card}>
+  return (
+    <Box sx={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      p: 2.5,
+      bgcolor: 'background.default',
+    }}>
+      <Box sx={{ width: '100%', maxWidth: 440 }}>
+
+        {/* Logo Header */}
+        <Stack alignItems="center" sx={{ mb: 4 }}>
+          <Box sx={{
+            width: 64, height: 64, borderRadius: '50%',
+            bgcolor: (t) => alpha(t.palette.primary.main, 0.15),
+            border: '1px solid',
+            borderColor: (t) => alpha(t.palette.primary.main, 0.4),
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            mb: 1.5,
+          }}>
+            <Gavel size={28} color="#7c6aff" strokeWidth={2.5} />
+          </Box>
+          <Typography variant="h5" fontWeight={800} letterSpacing="-0.03em">
+            가족문화 경매소
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            역할극 기반 실시간 경매 플랫폼
+          </Typography>
+        </Stack>
+
+        <Paper elevation={9} sx={{ p: 4, borderRadius: '20px' }}>
 
           {/* ── STEP: 역할 선택 ── */}
           {step === 'ROLE' && (
-            <>
-              <p style={{ ...S.sectionTitle, fontSize: '0.875rem', color: 'var(--text-2)', fontWeight: 500, margin: '0 0 1.25rem' }}>
+            <Stack spacing={1.5}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                 역할을 선택하세요
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {showTeacherMode && (
-                  <button
-                    style={S.roleCard(false)}
-                    onClick={() => setStep('TEACHER')}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(124,106,255,0.4)'; e.currentTarget.style.background = 'var(--violet-dim)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-default)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
-                  >
-                    <div style={S.roleIcon('124,106,255')}>
-                      <Gavel size={22} color="var(--violet)" />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '0.2rem' }}>교사 (재판장)</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-2)' }}>경매를 시작하고 관리합니다</div>
-                    </div>
-                    <ArrowRight size={18} color="var(--text-3)" />
-                  </button>
-                )}
+              </Typography>
 
-                <button
-                  style={S.roleCard(false)}
-                  onClick={() => setStep('SESSION_CODE')}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(56,189,248,0.4)'; e.currentTarget.style.background = 'var(--sky-dim)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-default)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
-                >
-                  <div style={S.roleIcon('56,189,248')}>
-                    <Users size={22} color="var(--sky)" />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '0.2rem' }}>학생 (모둠)</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-2)' }}>세션 코드로 경매에 참여합니다</div>
-                  </div>
-                  <ArrowRight size={18} color="var(--text-3)" />
-                </button>
-              </div>
-            </>
+              {showTeacherMode && (
+                <RoleCard
+                  onClick={() => setStep('TEACHER')}
+                  icon={<Gavel size={22} color="#7c6aff" />}
+                  title="교사 (재판장)"
+                  desc="경매를 시작하고 관리합니다"
+                />
+              )}
+
+              <RoleCard
+                onClick={() => setStep('SESSION_CODE')}
+                icon={<Users size={22} color="#7c6aff" />}
+                title="학생 (모둠)"
+                desc="세션 코드로 경매에 참여합니다"
+              />
+            </Stack>
           )}
 
           {/* ── STEP: 교사 입장 ── */}
           {step === 'TEACHER' && (
             <>
-              <button style={S.backBtn} onClick={() => setStep('ROLE')}>
-                <ChevronLeft size={16} /> 뒤로
-              </button>
-              <p style={S.sectionTitle}><Gavel size={18} color="var(--violet)" /> 교사로 입장</p>
+              <BackBtn onClick={() => setStep('ROLE')} />
 
-              <div style={S.fieldGroup}>
-                <span style={S.label}>학년 / 반</span>
-                <div style={S.row}>
-                  <input className="input-field" type="number" placeholder="학년" value={teacherGrade}
-                    onChange={e => setTeacherGrade(e.target.value)} min="1" max="9" autoFocus style={{ textAlign: 'center' }} />
-                  <input className="input-field" type="number" placeholder="반" value={teacherClassNum}
-                    onChange={e => setTeacherClassNum(e.target.value)} min="1" max="20" style={{ textAlign: 'center' }}
-                    onKeyDown={e => e.key === 'Enter' && handleTeacherJoin()} />
-                </div>
-              </div>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2.5 }}>
+                <Gavel size={18} color="#7c6aff" />
+                <Typography fontWeight={700}>교사로 입장</Typography>
+              </Stack>
 
-              <button
-                style={{ width: '100%', marginTop: '0.5rem', padding: '0.85rem', background: 'var(--violet)', color: '#fff', border: '1px solid var(--violet)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontFamily: 'Inter,sans-serif', fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', transition: 'all 0.18s', boxShadow: '0 2px 8px rgba(124,106,255,0.3)' }}
+              <FieldLabel>학년 / 반</FieldLabel>
+              <Stack direction="row" spacing={1} sx={{ mb: 3 }}>
+                <TextField
+                  fullWidth type="number" placeholder="학년"
+                  value={teacherGrade}
+                  onChange={e => setTeacherGrade(e.target.value)}
+                  inputProps={{ min: 1, max: 9, style: { textAlign: 'center' } }}
+                  autoFocus
+                />
+                <TextField
+                  fullWidth type="number" placeholder="반"
+                  value={teacherClassNum}
+                  onChange={e => setTeacherClassNum(e.target.value)}
+                  inputProps={{ min: 1, max: 20, style: { textAlign: 'center' } }}
+                  onKeyDown={e => e.key === 'Enter' && handleTeacherJoin()}
+                />
+              </Stack>
+
+              <Button
+                fullWidth variant="contained" size="large"
+                endIcon={<ArrowRight size={18} />}
                 onClick={handleTeacherJoin}
-                onMouseEnter={e => { e.currentTarget.style.background = '#6a58f0'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(124,106,255,0.5)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'var(--violet)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(124,106,255,0.3)'; }}
               >
-                세션 시작 <ArrowRight size={18} />
-              </button>
+                세션 시작
+              </Button>
             </>
           )}
 
           {/* ── STEP: 세션 코드 입력 ── */}
           {step === 'SESSION_CODE' && (
             <>
-              {showTeacherMode && (
-                <button style={S.backBtn} onClick={() => setStep('ROLE')}>
-                  <ChevronLeft size={16} /> 뒤로
-                </button>
-              )}
-              <p style={S.sectionTitle}><Hash size={18} color="var(--sky)" /> 세션 코드 입력</p>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-2)', marginBottom: '1.25rem', lineHeight: 1.6 }}>
+              {showTeacherMode && <BackBtn onClick={() => setStep('ROLE')} />}
+
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                <Hash size={18} color="#7c6aff" />
+                <Typography fontWeight={700}>세션 코드 입력</Typography>
+              </Stack>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5, lineHeight: 1.6 }}>
                 교사(재판장) 화면에 표시된 6자리 코드를 입력하세요.
-              </p>
+              </Typography>
 
-              <div style={S.fieldGroup}>
-                <input
-                  className="input-field"
-                  type="text"
-                  value={sessionCode}
-                  onChange={e => { setSessionCode(e.target.value.toUpperCase()); setSessionCodeError(''); }}
-                  onKeyDown={e => e.key === 'Enter' && handleSessionCodeSubmit()}
-                  placeholder="AB3X7K"
-                  maxLength={6}
-                  autoFocus
-                  style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '2rem', fontWeight: 700, textAlign: 'center', letterSpacing: '0.3em', padding: '1rem' }}
-                />
-                {sessionCodeError && <p style={S.errorText}>{sessionCodeError}</p>}
-              </div>
+              <TextField
+                fullWidth
+                value={sessionCode}
+                onChange={e => { setSessionCode(e.target.value.toUpperCase()); setSessionCodeError(''); }}
+                onKeyDown={e => e.key === 'Enter' && handleSessionCodeSubmit()}
+                placeholder="AB3X7K"
+                inputProps={{
+                  maxLength: 6,
+                  style: {
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: '2rem',
+                    fontWeight: 700,
+                    textAlign: 'center',
+                    letterSpacing: '0.3em',
+                    padding: '1rem',
+                  },
+                }}
+                error={!!sessionCodeError}
+                helperText={sessionCodeError}
+                autoFocus
+                sx={{ mb: 2 }}
+              />
 
-              <button
-                style={{ width: '100%', padding: '0.85rem', background: 'var(--sky)', color: '#071520', border: '1px solid var(--sky)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontFamily: 'Inter,sans-serif', fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', transition: 'all 0.18s' }}
+              <Button
+                fullWidth variant="contained" size="large"
+                endIcon={<ArrowRight size={18} />}
                 onClick={handleSessionCodeSubmit}
-                onMouseEnter={e => e.currentTarget.style.background = '#29aae8'}
-                onMouseLeave={e => e.currentTarget.style.background = 'var(--sky)'}
               >
-                모둠 목록 불러오기 <ArrowRight size={18} />
-              </button>
+                모둠 목록 불러오기
+              </Button>
             </>
           )}
 
           {/* ── STEP: 모둠 선택 ── */}
           {step === 'TEAM_SELECT' && (
             <>
-              <button style={S.backBtn} onClick={() => setStep('SESSION_CODE')}>
-                <ChevronLeft size={16} /> 코드 재입력
-              </button>
-              <p style={S.sectionTitle}><Users size={18} color="var(--sky)" /> 우리 모둠 선택</p>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-2)', marginBottom: '1rem' }}>
+              <BackBtn onClick={() => setStep('SESSION_CODE')} label="코드 재입력" />
+
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                <Users size={18} color="#7c6aff" />
+                <Typography fontWeight={700}>우리 모둠 선택</Typography>
+              </Stack>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: '0.8rem' }}>
                 모둠별로 대표 기기 1대만 접속해야 합니다.
-              </p>
+              </Typography>
 
               {lobbyTeams.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-2)', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-default)' }}>
-                  <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>⏳</div>
-                  <div style={{ fontSize: '0.9rem' }}>교사가 아직 세션을 시작하지 않았거나<br />코드가 올바르지 않습니다.</div>
-                </div>
+                <Box sx={{
+                  textAlign: 'center', py: 4, px: 2,
+                  bgcolor: 'rgba(255,255,255,0.02)',
+                  borderRadius: 2,
+                  border: '1px dashed',
+                  borderColor: 'divider',
+                }}>
+                  <Typography sx={{ fontSize: '2rem', mb: 1.5 }}>⏳</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    교사가 아직 세션을 시작하지 않았거나<br />코드가 올바르지 않습니다.
+                  </Typography>
+                </Box>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75 }}>
                   {lobbyTeams.map(team => {
                     const connected = connectedTeams?.includes(team.id);
                     return (
-                      <button
+                      <ButtonBase
                         key={team.id}
-                        style={S.teamBtn(connected)}
                         disabled={connected}
                         onClick={() => { setSelectedTeam(team); setStep('TEAM_INFO'); }}
-                        onMouseEnter={e => { if (!connected) { e.currentTarget.style.borderColor = 'rgba(56,189,248,0.4)'; e.currentTarget.style.background = 'var(--sky-dim)'; } }}
-                        onMouseLeave={e => { if (!connected) { e.currentTarget.style.borderColor = 'var(--border-default)'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; } }}
+                        sx={{
+                          p: '0.85rem 0.75rem',
+                          bgcolor: connected ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)',
+                          border: '1px solid',
+                          borderColor: connected ? 'rgba(255,255,255,0.05)' : 'divider',
+                          borderRadius: 1.5,
+                          cursor: connected ? 'not-allowed' : 'pointer',
+                          color: connected ? 'text.disabled' : 'text.primary',
+                          fontSize: '0.95rem',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          opacity: connected ? 0.6 : 1,
+                          transition: 'all 0.15s',
+                          '&:hover:not(.Mui-disabled)': {
+                            borderColor: 'primary.main',
+                            bgcolor: (t) => alpha(t.palette.primary.main, 0.1),
+                          },
+                        }}
                       >
                         <span>{team.name}</span>
-                        {connected
-                          ? <span style={{ fontSize: '0.7rem', color: 'var(--emerald)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--emerald)', display: 'inline-block' }} />접속중</span>
-                          : <ArrowRight size={14} color="var(--text-3)" />
-                        }
-                      </button>
+                        {connected ? (
+                          <Stack direction="row" alignItems="center" spacing={0.5}
+                            sx={{ fontSize: '0.7rem', color: 'success.main' }}>
+                            <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'success.main' }} />
+                            <span>접속중</span>
+                          </Stack>
+                        ) : (
+                          <ArrowRight size={14} />
+                        )}
+                      </ButtonBase>
                     );
                   })}
-                </div>
+                </Box>
               )}
             </>
           )}
@@ -350,60 +327,85 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTea
           {/* ── STEP: 모둠원 정보 입력 ── */}
           {step === 'TEAM_INFO' && selectedTeam && (
             <>
-              <button style={S.backBtn} onClick={() => { setStep('TEAM_SELECT'); setSelectedTeam(null); }}>
-                <ChevronLeft size={16} /> 모둠 선택으로
-              </button>
+              <BackBtn onClick={() => { setStep('TEAM_SELECT'); setSelectedTeam(null); }} label="모둠 선택으로" />
 
-              <div style={{ textAlign: 'center', marginBottom: '1.5rem', padding: '1rem', background: 'var(--sky-dim)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(56,189,248,0.2)' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--sky)', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '0.3rem' }}>선택한 모둠</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-1)' }}>{selectedTeam.name}</div>
-              </div>
+              <Box sx={{
+                textAlign: 'center', mb: 3, p: 1.75,
+                bgcolor: (t) => alpha(t.palette.primary.main, 0.1),
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: (t) => alpha(t.palette.primary.main, 0.2),
+              }}>
+                <Typography
+                  variant="caption"
+                  sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', mb: 0.5 }}
+                >
+                  선택한 모둠
+                </Typography>
+                <Typography variant="h5" fontWeight={800}>{selectedTeam.name}</Typography>
+              </Box>
 
-              <div style={S.fieldGroup}>
-                <span style={S.label}>학년 / 반</span>
-                <div style={S.row}>
-                  <input className="input-field" type="number" placeholder="학년" value={grade}
-                    onChange={e => setGrade(e.target.value)} min="1" max="9" autoFocus style={{ textAlign: 'center' }} />
-                  <input className="input-field" type="number" placeholder="반" value={classNum}
-                    onChange={e => setClassNum(e.target.value)} min="1" max="20" style={{ textAlign: 'center' }} />
-                </div>
-              </div>
+              <FieldLabel>학년 / 반</FieldLabel>
+              <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+                <TextField
+                  fullWidth type="number" placeholder="학년"
+                  value={grade}
+                  onChange={e => setGrade(e.target.value)}
+                  inputProps={{ min: 1, max: 9, style: { textAlign: 'center' } }}
+                  autoFocus
+                />
+                <TextField
+                  fullWidth type="number" placeholder="반"
+                  value={classNum}
+                  onChange={e => setClassNum(e.target.value)}
+                  inputProps={{ min: 1, max: 20, style: { textAlign: 'center' } }}
+                />
+              </Stack>
 
-              <div style={S.fieldGroup}>
-                <span style={S.label}>모둠원 이름</span>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
-                  {members.map((m, i) => (
-                    <input key={i} className="input-field" type="text" placeholder={`모둠원 ${i + 1}`}
-                      value={m} onChange={e => handleMemberChange(i, e.target.value)} maxLength={10} />
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
-                  <button
-                    onClick={() => setMembers([...members, ''])}
-                    style={{ flex: 1, padding: '0.4rem', background: 'transparent', border: '1px dashed var(--border-strong)', borderRadius: 'var(--radius-sm)', color: 'var(--text-2)', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'Inter,sans-serif' }}
-                  >+ 추가</button>
-                  {members.length > 1 && (
-                    <button
-                      onClick={() => setMembers(members.slice(0, -1))}
-                      style={{ flex: 1, padding: '0.4rem', background: 'transparent', border: '1px dashed rgba(248,113,113,0.3)', borderRadius: 'var(--radius-sm)', color: 'var(--rose)', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'Inter,sans-serif' }}
-                    >- 빼기</button>
-                  )}
-                </div>
-              </div>
+              <FieldLabel>모둠원 이름</FieldLabel>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.5, mt: 0.5, mb: 1 }}>
+                {members.map((m, i) => (
+                  <TextField
+                    key={i} size="small"
+                    placeholder={`모둠원 ${i + 1}`}
+                    value={m}
+                    onChange={e => handleMemberChange(i, e.target.value)}
+                    inputProps={{ maxLength: 10 }}
+                  />
+                ))}
+              </Box>
 
-              <button
-                style={{ width: '100%', marginTop: '0.25rem', padding: '0.85rem', background: 'var(--sky)', color: '#071520', border: '1px solid var(--sky)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontFamily: 'Inter,sans-serif', fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', transition: 'all 0.18s' }}
+              <Stack direction="row" spacing={0.75} sx={{ mb: 3 }}>
+                <Button
+                  fullWidth variant="outlined" size="small"
+                  onClick={() => setMembers([...members, ''])}
+                  sx={{ borderStyle: 'dashed', color: 'text.secondary', borderColor: 'divider' }}
+                >
+                  + 추가
+                </Button>
+                {members.length > 1 && (
+                  <Button
+                    fullWidth variant="outlined" size="small" color="error"
+                    onClick={() => setMembers(members.slice(0, -1))}
+                    sx={{ borderStyle: 'dashed' }}
+                  >
+                    - 빼기
+                  </Button>
+                )}
+              </Stack>
+
+              <Button
+                fullWidth variant="contained" size="large"
+                endIcon={<ArrowRight size={18} />}
                 onClick={handleTeamJoin}
-                onMouseEnter={e => e.currentTarget.style.background = '#29aae8'}
-                onMouseLeave={e => e.currentTarget.style.background = 'var(--sky)'}
               >
-                {selectedTeam.name}으로 입장 <ArrowRight size={18} />
-              </button>
+                {selectedTeam.name}으로 입장
+              </Button>
             </>
           )}
 
-        </div>
-      </div>
-    </div>
+        </Paper>
+      </Box>
+    </Box>
   );
 }

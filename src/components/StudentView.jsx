@@ -1,6 +1,9 @@
 import { useReducer, useEffect } from 'react';
 import { Gavel, AlertCircle, Check, LogOut, Clock } from 'lucide-react';
 import AuctionBoard from './AuctionBoard';
+import {
+  Box, Button, Tabs, Tab, Slider, TextField, Typography,
+} from '@mui/material';
 
 const INIT = { bidAmount: '', bidSubmitted: false, errorMsg: '', useSecretTicket: false, mode: 'BID', guessAmount: '' };
 
@@ -68,15 +71,23 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
 
   const isBidding = gameState.auctionPhase === 'BIDDING' || gameState.auctionPhase === 'REBIDDING';
 
-  /* ── small helpers ── */
-  const QuickBtn = ({ label, onClick, color = 'var(--violet)' }) => (
-    <button type="button" onClick={onClick}
-      style={{ flex: 1, padding: '0.4rem 0', background: `rgba(${color === 'var(--violet)' ? '124,106,255' : '56,189,248'},0.1)`, border: `1px solid ${color === 'var(--violet)' ? 'rgba(124,106,255,0.3)' : 'rgba(56,189,248,0.3)'}`, borderRadius: 'var(--radius-sm)', color, cursor: 'pointer', fontFamily: 'Inter,sans-serif', fontSize: '0.82rem', fontWeight: 600, transition: 'all 0.12s' }}
-      onMouseEnter={e => e.currentTarget.style.background = `rgba(${color === 'var(--violet)' ? '124,106,255' : '56,189,248'},0.22)`}
-      onMouseLeave={e => e.currentTarget.style.background = `rgba(${color === 'var(--violet)' ? '124,106,255' : '56,189,248'},0.1)`}
+  const QuickBtn = ({ label, onClick, color = 'primary' }) => (
+    <Button
+      type="button"
+      variant="outlined"
+      color={color}
+      size="small"
+      onClick={onClick}
+      sx={{
+        flex: 1,
+        minWidth: 0,
+        py: 0.5,
+        fontSize: '0.82rem',
+        fontWeight: 600,
+      }}
     >
       {label}
-    </button>
+    </Button>
   );
 
   return (
@@ -95,13 +106,19 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
             <div style={{ fontSize: '0.7rem', color: 'var(--text-2)', marginBottom: '0.1rem' }}>보유 코인</div>
             <div style={{ fontFamily: 'JetBrains Mono,monospace', fontWeight: 800, fontSize: '1.5rem', color: 'var(--amber)', lineHeight: 1 }}>{team?.budget}</div>
           </div>
-          <button onClick={onLogout}
-            style={{ padding: '0.4rem', background: 'transparent', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', color: 'var(--text-2)', cursor: 'pointer', display: 'flex', transition: 'all 0.15s' }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--rose)'; e.currentTarget.style.color = 'var(--rose)'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-default)'; e.currentTarget.style.color = 'var(--text-2)'; }}
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={onLogout}
+            sx={{
+              p: 0.5, minWidth: 0,
+              borderColor: 'var(--border-default)',
+              color: 'var(--text-2)',
+              '&:hover': { borderColor: 'error.main', color: 'error.main' },
+            }}
           >
             <LogOut size={16} />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -123,17 +140,17 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
 
             {/* Rebid banners */}
             {gameState.auctionPhase === 'REBIDDING' && gameState.secretTicketApprovedTeams?.includes(team.id) && (
-              <div style={{ background: 'var(--sky-dim)', border: '1px solid rgba(56,189,248,0.3)', borderRadius: 'var(--radius-lg)', padding: '1.25rem', marginBottom: '1rem' }}>
-                <div style={{ fontWeight: 700, color: 'var(--sky)', marginBottom: '0.75rem', fontSize: '0.9rem' }}>🔓 비밀 첩보 — 1차 입찰 결과</div>
+              <div style={{ background: 'var(--violet-light-dim)', border: '1px solid rgba(165,153,255,0.3)', borderRadius: 'var(--radius-lg)', padding: '1.25rem', marginBottom: '1rem' }}>
+                <div style={{ fontWeight: 700, color: 'var(--violet-light)', marginBottom: '0.75rem', fontSize: '0.9rem' }}>🔓 비밀 첩보 — 1차 입찰 결과</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.5rem' }}>
                   {gameState.teams.map(t => initialBids?.[t.id] !== undefined ? (
-                    <div key={t.id} style={{ padding: '0.6rem 0.75rem', background: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius-md)', borderLeft: '3px solid var(--sky)' }}>
+                    <div key={t.id} style={{ padding: '0.6rem 0.75rem', background: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius-md)', borderLeft: '3px solid var(--violet-light)' }}>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-2)' }}>{t.name}</div>
                       <div style={{ fontFamily: 'JetBrains Mono,monospace', fontWeight: 700, fontSize: '1rem', color: 'var(--text-1)' }}>{initialBids[t.id]}</div>
                     </div>
                   ) : null)}
                 </div>
-                <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--sky)', fontWeight: 600 }}>💡 전략을 수정해 2차 입찰을 제출하세요.</p>
+                <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--violet-light)', fontWeight: 600 }}>💡 전략을 수정해 2차 입찰을 제출하세요.</p>
               </div>
             )}
 
@@ -146,102 +163,206 @@ export default function StudentView({ gameState, socket, teamId, bidLimits, init
               </div>
             )}
 
-            {/* Bidding UI (fixed bottom) */}
+            {/* ── Bidding Panel (sticky bottom) ── */}
             {isBidding && !bidSubmitted && (
-              <div className="sticky-bottom-bar" style={{ maxWidth: '720px', margin: '0 auto' }}>
-                {/* Mode tab */}
-                <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: 'var(--radius-md)', padding: '3px', marginBottom: '1rem', border: '1px solid var(--border-subtle)' }}>
-                  {[
-                    { key: 'BID', label: '💰 경매 참여', color: 'var(--violet)' },
-                    { key: 'GUESS', label: '🤔 포기 + 예측', color: 'var(--sky)' },
-                  ].map(tab => (
-                    <button key={tab.key} type="button"
-                      onClick={() => dispatch({ type: 'SET_MODE', v: tab.key })}
-                      style={{ flex: 1, padding: '0.55rem', borderRadius: 'calc(var(--radius-md) - 3px)', border: 'none', background: mode === tab.key ? (tab.key === 'BID' ? 'var(--violet)' : 'var(--sky)') : 'transparent', color: mode === tab.key ? (tab.key === 'BID' ? '#fff' : '#071520') : 'var(--text-2)', cursor: 'pointer', fontFamily: 'Inter,sans-serif', fontWeight: 700, fontSize: '0.85rem', transition: 'all 0.15s' }}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
+              <Box className="sticky-bottom-bar" sx={{ maxWidth: '720px', mx: 'auto' }}>
+
+                {/* Mode tabs */}
+                <Tabs
+                  value={mode}
+                  onChange={(_, v) => dispatch({ type: 'SET_MODE', v })}
+                  variant="fullWidth"
+                  sx={{
+                    mb: 2,
+                    background: 'rgba(255,255,255,0.04)',
+                    borderRadius: 2,
+                    border: '1px solid var(--border-subtle)',
+                    minHeight: 44,
+                    '& .MuiTabs-indicator': {
+                      height: '100%',
+                      borderRadius: 1.5,
+                      background: mode === 'BID' ? '#7c6aff' : '#a599ff',
+                      zIndex: 0,
+                    },
+                    '& .MuiTab-root': {
+                      zIndex: 1,
+                      minHeight: 44,
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      color: 'var(--text-2)',
+                      '&.Mui-selected': { color: '#fff' },
+                    },
+                  }}
+                >
+                  <Tab value="BID" label="💰 경매 참여" />
+                  <Tab value="GUESS" label="🤔 포기 + 예측" />
+                </Tabs>
 
                 {/* BID mode */}
                 {mode === 'BID' && (
-                  <form onSubmit={handleSubmit}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-2)', marginBottom: '0.5rem' }}>
-                      <span>입찰 금액 (코인)</span>
-                      <span style={{ color: 'var(--amber)' }}>최대 {bidLimits.maxBid}</span>
-                    </div>
-                    <input type="range" min="0" max={bidLimits.maxBid || 1} step={bidUnit}
-                      value={parseInt(bidAmount,10)||0}
-                      onChange={e => dispatch({ type: 'BID_AMT', v: e.target.value })}
+                  <Box component="form" onSubmit={handleSubmit}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-2)', mb: 0.5 }}>
+                      <Typography variant="caption" color="text.secondary">입찰 금액 (코인)</Typography>
+                      <Typography variant="caption" sx={{ color: 'secondary.main' }}>최대 {bidLimits.maxBid}</Typography>
+                    </Box>
+
+                    <Slider
+                      value={parseInt(bidAmount, 10) || 0}
+                      onChange={(_, v) => dispatch({ type: 'BID_AMT', v: String(v) })}
+                      min={0}
+                      max={bidLimits.maxBid || 1}
+                      step={bidUnit}
                       disabled={bidLimits.maxBid === 0}
-                      style={{ width: '100%', marginBottom: '0.5rem' }}
+                      color="primary"
+                      sx={{ mb: 1 }}
                     />
-                    <input type="number" className="input-field"
-                      value={bidAmount} onChange={e => dispatch({ type: 'BID_AMT', v: e.target.value })}
-                      placeholder="0" min="0" max={bidLimits.maxBid} step={bidUnit} autoFocus
-                      style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: '1.6rem', fontWeight: 700, textAlign: 'right', marginBottom: '0.5rem' }}
+
+                    <TextField
+                      fullWidth
+                      type="number"
+                      value={bidAmount}
+                      onChange={e => dispatch({ type: 'BID_AMT', v: e.target.value })}
+                      placeholder="0"
+                      inputProps={{ min: 0, max: bidLimits.maxBid, step: bidUnit, autoFocus: true }}
+                      sx={{
+                        mb: 1,
+                        '& input': {
+                          fontFamily: 'JetBrains Mono,monospace',
+                          fontSize: '1.6rem',
+                          fontWeight: 700,
+                          textAlign: 'right',
+                          py: 1,
+                        },
+                      }}
                     />
-                    <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.75rem' }}>
-                      {[1,2,4,10].map(m => <QuickBtn key={m} label={`+${bidUnit*m}`} onClick={() => adjustBid(bidUnit*m)} />)}
+
+                    <Box sx={{ display: 'flex', gap: 0.5, mb: 1.25 }}>
+                      {[1, 2, 4, 10].map(m => (
+                        <QuickBtn key={m} label={`+${bidUnit * m}`} onClick={() => adjustBid(bidUnit * m)} />
+                      ))}
                       <QuickBtn label="MAX" onClick={() => dispatch({ type: 'BID_AMT', v: String(bidLimits.maxBid) })} />
-                    </div>
+                    </Box>
 
                     {team.hasSecretTicket && gameState.auctionPhase === 'BIDDING' && (
-                      <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', padding: '0.75rem', background: 'var(--sky-dim)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: 'var(--radius-md)', cursor: 'pointer', marginBottom: '0.75rem' }}>
-                        <input type="checkbox" checked={useSecretTicket} onChange={e => dispatch({ type: 'SET_SECRET', v: e.target.checked })} style={{ width: 18, height: 18, flexShrink: 0, marginTop: '0.1rem', accentColor: 'var(--sky)' }} />
-                        <div>
-                          <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--sky)' }}>시크릿 해제권 사용 (-100 코인)</div>
-                          <div style={{ fontSize: '0.78rem', color: 'var(--text-2)', marginTop: '0.2rem', lineHeight: 1.5 }}>1차 입찰가 전체 공개 후 재입찰 기회를 얻습니다.</div>
-                        </div>
-                      </label>
+                      <Box
+                        component="label"
+                        sx={{
+                          display: 'flex', alignItems: 'flex-start', gap: 1,
+                          p: 1.25,
+                          background: 'var(--violet-light-dim)',
+                          border: '1px solid rgba(165,153,255,0.25)',
+                          borderRadius: 2,
+                          cursor: 'pointer',
+                          mb: 1.25,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={useSecretTicket}
+                          onChange={e => dispatch({ type: 'SET_SECRET', v: e.target.checked })}
+                          style={{ width: 18, height: 18, flexShrink: 0, marginTop: '0.1rem', accentColor: 'var(--violet-light)' }}
+                        />
+                        <Box>
+                          <Typography sx={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--violet-light)' }}>
+                            시크릿 해제권 사용 (-100 코인)
+                          </Typography>
+                          <Typography sx={{ fontSize: '0.78rem', color: 'text.secondary', mt: 0.25, lineHeight: 1.5 }}>
+                            1차 입찰가 전체 공개 후 재입찰 기회를 얻습니다.
+                          </Typography>
+                        </Box>
+                      </Box>
                     )}
 
                     {bidLimits.maxBid === 0 && (
-                      <div style={{ padding: '0.65rem 0.9rem', background: 'var(--amber-dim)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', color: 'var(--amber)', lineHeight: 1.5, marginBottom: '0.75rem' }}>
-                        이미 낙찰받았거나 예산 부족으로 참여할 수 없습니다.
-                      </div>
+                      <Box sx={{ p: 1, background: 'var(--amber-dim)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 2, fontSize: '0.82rem', color: 'var(--amber)', lineHeight: 1.5, mb: 1.25 }}>
+                        <Typography variant="caption" sx={{ color: 'secondary.main' }}>
+                          이미 낙찰받았거나 예산 부족으로 참여할 수 없습니다.
+                        </Typography>
+                      </Box>
                     )}
+
                     {errorMsg && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--rose)', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>
-                        <AlertCircle size={15} /> {errorMsg}
-                      </div>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'error.main', mb: 1 }}>
+                        <AlertCircle size={15} />
+                        <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600, fontSize: '0.85rem' }}>{errorMsg}</Typography>
+                      </Box>
                     )}
-                    <button type="submit" disabled={bidLimits.maxBid === 0}
-                      style={{ width: '100%', padding: '0.9rem', background: bidLimits.maxBid === 0 ? 'rgba(255,255,255,0.04)' : 'var(--violet)', border: `1px solid ${bidLimits.maxBid === 0 ? 'var(--border-subtle)' : 'var(--violet)'}`, borderRadius: 'var(--radius-lg)', color: bidLimits.maxBid === 0 ? 'var(--text-3)' : '#fff', cursor: bidLimits.maxBid === 0 ? 'not-allowed' : 'pointer', fontFamily: 'Inter,sans-serif', fontSize: '0.95rem', fontWeight: 800, letterSpacing: '0.05em', transition: 'all 0.15s', boxShadow: bidLimits.maxBid !== 0 ? '0 2px 12px rgba(124,106,255,0.4)' : 'none' }}>
+
+                    <Button
+                      type="submit"
+                      fullWidth
+                      variant="contained"
+                      color="primary"
+                      disabled={bidLimits.maxBid === 0}
+                      size="large"
+                      sx={{ py: 1.5, fontSize: '0.95rem', letterSpacing: '0.05em' }}
+                    >
                       밀봉 입찰서 제출
-                    </button>
-                  </form>
+                    </Button>
+                  </Box>
                 )}
 
                 {/* GUESS mode */}
                 {mode === 'GUESS' && (
-                  <form onSubmit={handleGuessSubmit}>
-                    <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', marginBottom: '0.75rem', fontSize: '0.82rem', color: 'var(--text-2)', lineHeight: 1.6 }}>
-                      입찰을 포기하고 <strong style={{ color: 'var(--amber)' }}>최종 낙찰가</strong>를 예측하면,<br />
-                      가장 근접한 모둠에게 <strong style={{ color: 'var(--emerald)' }}>보너스 100 코인</strong>이 지급됩니다.
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-2)', marginBottom: '0.4rem' }}>예상 낙찰가 (코인)</div>
-                    <input type="number" className="input-field"
-                      value={guessAmount} onChange={e => dispatch({ type: 'GUESS_AMT', v: e.target.value })}
-                      placeholder="0" min="0" step={bidUnit} autoFocus
-                      style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: '1.6rem', fontWeight: 700, textAlign: 'right', marginBottom: '0.5rem' }}
+                  <Box component="form" onSubmit={handleGuessSubmit}>
+                    <Box sx={{ p: 1.25, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-subtle)', borderRadius: 2, mb: 1.25 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
+                        입찰을 포기하고 <strong style={{ color: 'var(--amber)' }}>최종 낙찰가</strong>를 예측하면,<br />
+                        가장 근접한 모둠에게 <strong style={{ color: 'var(--emerald)' }}>보너스 100 코인</strong>이 지급됩니다.
+                      </Typography>
+                    </Box>
+
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                      예상 낙찰가 (코인)
+                    </Typography>
+
+                    <TextField
+                      fullWidth
+                      type="number"
+                      value={guessAmount}
+                      onChange={e => dispatch({ type: 'GUESS_AMT', v: e.target.value })}
+                      placeholder="0"
+                      inputProps={{ min: 0, step: bidUnit, autoFocus: true }}
+                      sx={{
+                        mb: 1,
+                        '& input': {
+                          fontFamily: 'JetBrains Mono,monospace',
+                          fontSize: '1.6rem',
+                          fontWeight: 700,
+                          textAlign: 'right',
+                          py: 1,
+                        },
+                      }}
                     />
-                    <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.75rem' }}>
-                      {[1,2,4,10].map(m => <QuickBtn key={m} label={`+${bidUnit*m}`} onClick={() => adjustGuess(bidUnit*m)} color="var(--sky)" />)}
-                    </div>
+
+                    <Box sx={{ display: 'flex', gap: 0.5, mb: 1.25 }}>
+                      {[1, 2, 4, 10].map(m => (
+                        <QuickBtn key={m} label={`+${bidUnit * m}`} onClick={() => adjustGuess(bidUnit * m)} color="primary" />
+                      ))}
+                    </Box>
+
                     {errorMsg && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--rose)', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>
-                        <AlertCircle size={15} /> {errorMsg}
-                      </div>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                        <AlertCircle size={15} color="var(--rose)" />
+                        <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600, fontSize: '0.85rem' }}>{errorMsg}</Typography>
+                      </Box>
                     )}
-                    <button type="submit"
-                      style={{ width: '100%', padding: '0.9rem', background: 'var(--sky)', border: '1px solid var(--sky)', borderRadius: 'var(--radius-lg)', color: '#071520', cursor: 'pointer', fontFamily: 'Inter,sans-serif', fontSize: '0.95rem', fontWeight: 800, letterSpacing: '0.05em', transition: 'all 0.15s' }}>
+
+                    <Button
+                      type="submit"
+                      fullWidth
+                      variant="contained"
+                      sx={{
+                        py: 1.5, fontSize: '0.95rem', letterSpacing: '0.05em',
+                        background: 'var(--violet-light)',
+                        '&:hover': { background: '#b8adff' },
+                      }}
+                    >
                       예측 금액 제출
-                    </button>
-                  </form>
+                    </Button>
+                  </Box>
                 )}
-              </div>
+              </Box>
             )}
 
             {/* Submitted wait state */}
