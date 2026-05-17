@@ -142,8 +142,8 @@ const S = {
   }),
 };
 
-export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTeams }) {
-  const [step, setStep] = useState('ROLE');
+export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTeams, showTeacherMode }) {
+  const [step, setStep] = useState(showTeacherMode ? 'ROLE' : 'SESSION_CODE');
   const [selectedTeam, setSelectedTeam] = useState(null);
 
   const [teacherPin, setTeacherPin] = useState('');
@@ -201,21 +201,23 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTea
                 역할을 선택하세요
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <button
-                  style={S.roleCard(false)}
-                  onClick={() => setStep('TEACHER')}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(124,106,255,0.4)'; e.currentTarget.style.background = 'var(--violet-dim)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-default)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
-                >
-                  <div style={S.roleIcon('124,106,255')}>
-                    <Gavel size={22} color="var(--violet)" />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '0.2rem' }}>교사 (재판장)</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-2)' }}>경매를 시작하고 관리합니다</div>
-                  </div>
-                  <ArrowRight size={18} color="var(--text-3)" />
-                </button>
+                {showTeacherMode && (
+                  <button
+                    style={S.roleCard(false)}
+                    onClick={() => setStep('TEACHER')}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(124,106,255,0.4)'; e.currentTarget.style.background = 'var(--violet-dim)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-default)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+                  >
+                    <div style={S.roleIcon('124,106,255')}>
+                      <Gavel size={22} color="var(--violet)" />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '0.2rem' }}>교사 (재판장)</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-2)' }}>경매를 시작하고 관리합니다</div>
+                    </div>
+                    <ArrowRight size={18} color="var(--text-3)" />
+                  </button>
+                )}
 
                 <button
                   style={S.roleCard(false)}
@@ -275,9 +277,11 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTea
           {/* ── STEP: 세션 코드 입력 ── */}
           {step === 'SESSION_CODE' && (
             <>
-              <button style={S.backBtn} onClick={() => setStep('ROLE')}>
-                <ChevronLeft size={16} /> 뒤로
-              </button>
+              {showTeacherMode && (
+                <button style={S.backBtn} onClick={() => setStep('ROLE')}>
+                  <ChevronLeft size={16} /> 뒤로
+                </button>
+              )}
               <p style={S.sectionTitle}><Hash size={18} color="var(--sky)" /> 세션 코드 입력</p>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-2)', marginBottom: '1.25rem', lineHeight: 1.6 }}>
                 교사(재판장) 화면에 표시된 6자리 코드를 입력하세요.

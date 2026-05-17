@@ -162,8 +162,10 @@ function App() {
     };
   }, []); // socket listeners are set up once on mount
 
+  const showTeacherMode = new URLSearchParams(window.location.search).has('teacher');
+
   if (!role) {
-    return <Lobby onJoin={handleJoin} connectedTeams={connectedTeams} onRequestTeams={handleRequestTeams} lobbyTeams={lobbyTeams} />;
+    return <Lobby showTeacherMode={showTeacherMode} onJoin={handleJoin} connectedTeams={connectedTeams} onRequestTeams={handleRequestTeams} lobbyTeams={lobbyTeams} />;
   }
 
   if (!gameState) {
