@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sensuous Editorial Auction UI (Korean)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Noto Serif KR for elegant Korean headings -->
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,400&family=Noto+Serif+KR:wght@300;400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <!-- Pretendard for modern, clean Korean body text -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  
+  <style>
+    :root {
+      /* Sensuous, Editorial Palette */
+      --bg-cream: #F4F1EC;
+      --bg-paper: #FCFAF8;
+      --text-dark: #1A1A1A;
+      --text-muted: #807D78;
+      
+      --accent-green: #1A3626;
+      --accent-rust: #B54F35;
+      --accent-gold: #D4AF37;
+      
+      --font-serif-en: 'Cormorant Garamond', serif;
+      --font-serif-kr: 'Noto Serif KR', serif;
+      --font-sans: 'Pretendard', sans-serif;
+      --font-numbers: 'Playfair Display', serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: var(--font-sans);
+      background-color: #e5e0d8;
+      color: var(--text-dark);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4rem;
+      padding: 4rem 2rem;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .prototype-title {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .prototype-title h2 { font-family: var(--font-serif-kr); font-weight: 400; color: var(--accent-green); }
+    .prototype-title p { color: var(--text-muted); font-weight: 300; letter-spacing: -0.02em; }
+
+    /* --- Teacher View (16:9 Presentation) --- */
+    .teacher-container {
+      width: 100%;
+      max-width: 1280px;
+      aspect-ratio: 16 / 9;
+      background: var(--bg-paper);
+      box-shadow: 0 30px 60px rgba(0,0,0,0.05);
+      position: relative;
+      padding: 3.5rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .teacher-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      border-bottom: 1px solid rgba(0,0,0,0.08);
+      padding-bottom: 1.5rem;
+      margin-bottom: 3rem;
+    }
+
+    .teacher-header h1 {
+      font-family: var(--font-serif-kr);
+      font-size: 2.5rem;
+      font-weight: 600;
+      margin: 0;
+      letter-spacing: -0.05em;
+      color: var(--text-dark);
+    }
+    .teacher-header h1 span {
+      font-family: var(--font-serif-en);
+      font-style: italic;
+      color: var(--accent-rust);
+      font-size: 3rem;
+      font-weight: 300;
+      margin-left: 0.5rem;
+    }
+
+    .teacher-header .session-code {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.2rem;
+    }
+    .teacher-header .session-code strong {
+      font-family: var(--font-numbers);
+      font-size: 1.5rem;
+      color: var(--accent-green);
+      letter-spacing: 0.2em;
+    }
+
+    .teacher-content {
+      display: flex;
+      gap: 4rem;
+      flex: 1;
+    }
+
+    /* Left: Current Auction Item */
+    .current-auction {
+      flex: 1.5;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    
+    .current-auction .label {
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+    }
+
+    .current-auction h2 {
+      font-family: var(--font-serif-kr);
+      font-size: 3.5rem;
+      font-weight: 300;
+      line-height: 1.2;
+      margin: 0 0 2rem 0;
+      letter-spacing: -0.03em;
+    }
+
+    .bid-status-box {
+      border-left: 2px solid var(--accent-rust);
+      padding-left: 1.5rem;
+    }
+    .bid-status-box .title {
+      font-size: 0.8rem;
+      color: var(--accent-rust);
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+    .bid-status-box .value {
+      font-family: var(--font-numbers);
+      font-size: 2.5rem;
+      color: var(--text-dark);
+    }
+    .bid-status-box .value span {
+      font-family: var(--font-serif-kr);
+      font-size: 1.2rem;
+      color: var(--text-muted);
+    }
+
+    /* Right: Team Grid */
+    .team-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      align-content: start;
+    }
+
+    .team-card {
+      padding: 1.5rem;
+      border: 1px solid rgba(0,0,0,0.06);
+      background: var(--bg-cream);
+      position: relative;
+    }
+    .team-card.bidded {
+      background: #fff;
+      border-color: rgba(26, 54, 38, 0.2);
+      box-shadow: 0 10px 20px rgba(0,0,0,0.03);
+    }
+
+    .team-card .team-name {
+      font-family: var(--font-sans);
+      font-size: 0.8rem;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+    }
+    
+    .team-card .budget {
+      font-family: var(--font-numbers);
+      font-size: 2rem;
+      margin: 0;
+      color: var(--text-dark);
+    }
+
+    .status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      opacity: 0.3;
+    }
+    .team-card.bidded .status-dot {
+      background: var(--accent-green);
+      opacity: 1;
+      box-shadow: 0 0 0 4px rgba(26,54,38,0.1);
+    }
+
+
+    /* --- Student View (Mobile Frame) --- */
+    .student-container {
+      width: 100%;
+      max-width: 400px;
+      height: 800px;
+      background: var(--accent-green);
+      border-radius: 40px;
+      box-shadow: 0 30px 60px rgba(26,54,38,0.3);
+      padding: 3rem 2rem;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      color: var(--bg-paper);
+    }
+
+    .student-container::before {
+      content: '';
+      position: absolute;
+      top: -20%; right: -20%;
+      width: 80%; height: 50%;
+      background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%);
+      filter: blur(40px);
+    }
+
+    .mobile-top {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 3rem;
+      z-index: 1;
+    }
+    .mobile-top .room-name {
+      font-family: var(--font-serif-kr);
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+    .mobile-top .badge {
+      font-size: 0.7rem;
+      border: 1px solid rgba(255,255,255,0.3);
+      padding: 0.2rem 0.6rem;
+      border-radius: 100px;
+      letter-spacing: 0.05em;
+    }
+
+    .mobile-item {
+      z-index: 1;
+      margin-bottom: 3rem;
+    }
+    .mobile-item .label {
+      font-size: 0.75rem;
+      opacity: 0.7;
+      margin-bottom: 0.5rem;
+    }
+    .mobile-item h2 {
+      font-family: var(--font-serif-kr);
+      font-size: 2.2rem;
+      font-weight: 300;
+      margin: 0;
+      line-height: 1.3;
+      letter-spacing: -0.05em;
+    }
+
+    .mobile-balance {
+      z-index: 1;
+      margin-bottom: auto;
+    }
+    .mobile-balance .label {
+      font-size: 0.75rem;
+      opacity: 0.7;
+      margin-bottom: 0.5rem;
+    }
+    .mobile-balance .amount {
+      font-family: var(--font-numbers);
+      font-size: 3.5rem;
+      line-height: 1;
+    }
+    .mobile-balance .amount span {
+      font-family: var(--font-serif-kr);
+      font-size: 1.2rem;
+      opacity: 0.7;
+    }
+
+    /* Secret Ticket Button */
+    .ticket-btn {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: var(--bg-paper);
+      padding: 1rem;
+      border-radius: 12px;
+      margin-bottom: 1rem;
+      font-family: var(--font-serif-kr);
+      font-size: 1.1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      z-index: 1;
+    }
+    .ticket-btn span { font-family: var(--font-sans); font-size: 0.8rem; opacity: 0.7; }
+
+    /* Action Bid Button */
+    .action-button {
+      background: var(--bg-paper);
+      color: var(--accent-green);
+      border: none;
+      padding: 1.2rem 1.5rem;
+      border-radius: 100px;
+      font-family: var(--font-sans);
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+      z-index: 1;
+      transition: transform 0.2s;
+    }
+    .action-button:hover { transform: translateY(-2px); }
+    .action-button:active { transform: translateY(2px); box-shadow: 0 5px 10px rgba(0,0,0,0.2); }
+    .action-button .icon {
+      background: var(--accent-rust);
+      color: #fff;
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 300;
+    }
+
+  </style>
+</head>
+<body>
+  <div class="prototype-title">
+    <h2>에디토리얼 경매 UI 프로토타입 (한국어 적용)</h2>
+    <p>Pretendard(본문)와 Noto Serif KR(제목) 폰트를 적용한 하이엔드 룩</p>
+  </div>
+  
+  <!-- Teacher View -->
+  <div class="teacher-container">
+    <div class="teacher-header">
+      <h1>자리 배정 경매 <span>Auction</span></h1>
+      <div class="session-code">
+        참여 코드
+        <strong>X7A9B</strong>
+      </div>
+    </div>
+
+    <div class="teacher-content">
+      <div class="current-auction">
+        <div class="label">현재 진행 중인 경매 (ITEM 03)</div>
+        <h2>창가 두 번째,<br>햇살이 잘 드는 자리</h2>
+        
+        <div style="margin-top: 4rem;">
+          <div class="bid-status-box">
+            <div class="title">최고 입찰가</div>
+            <div class="value">4,500 <span>G</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="team-grid">
+        <!-- Team 1 -->
+        <div class="team-card bidded">
+          <div class="team-name">1조 (홍길동 외 3명) <div class="status-dot"></div></div>
+          <div class="budget">12,500</div>
+        </div>
+        
+        <!-- Team 2 -->
+        <div class="team-card">
+          <div class="team-name">2조 (김철수 외 3명) <div class="status-dot"></div></div>
+          <div class="budget">8,000</div>
+        </div>
+
+        <!-- Team 3 -->
+        <div class="team-card">
+          <div class="team-name">3조 (이영희 외 3명) <div class="status-dot"></div></div>
+          <div class="budget">21,000</div>
+        </div>
+
+        <!-- Team 4 -->
+        <div class="team-card bidded">
+          <div class="team-name">4조 (박민수 외 3명) <div class="status-dot"></div></div>
+          <div class="budget">5,300</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Student View -->
+  <div class="student-container">
+    <div class="mobile-top">
+      <div class="room-name">2조</div>
+      <div class="badge">경매 진행 중</div>
+    </div>
+
+    <div class="mobile-item">
+      <div class="label">현재 매물 (ITEM 03)</div>
+      <h2>창가 두 번째,<br>햇살이 잘 드는 자리</h2>
+    </div>
+
+    <div class="mobile-balance">
+      <div class="label">나의 남은 예산</div>
+      <div class="amount">8,000 <span>G</span></div>
+    </div>
+
+    <button class="ticket-btn">
+      비밀 티켓 사용하기 <span>(잔여 1장)</span>
+    </button>
+
+    <button class="action-button">
+      입찰하기
+      <div class="icon">↑</div>
+    </button>
+  </div>
+
+</body>
+</html>

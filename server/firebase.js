@@ -69,6 +69,46 @@ async function loadAllRooms() {
   }
 }
 
+// 교과 템플릿 저장
+async function saveSubject({ name, categories, gameConfig }) {
+  if (!db) return null;
+  try {
+    const id = `subject_${Date.now()}`;
+    await db.collection('subjects').doc(id).set({
+      name,
+      categories,
+      gameConfig,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return id;
+  } catch (err) {
+    console.error('Error saving subject:', err);
+    return null;
+  }
+}
+
+// 저장된 교과 템플릿 목록 로드 (최신순)
+async function loadSubjects() {
+  if (!db) return [];
+  try {
+    const snapshot = await db.collection('subjects').orderBy('createdAt', 'desc').get();
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (err) {
+    console.error('Error loading subjects:', err);
+    return [];
+  }
+}
+
+// 교과 템플릿 삭제
+async function deleteSubject(subjectId) {
+  if (!db) return;
+  try {
+    await db.collection('subjects').doc(subjectId).delete();
+  } catch (err) {
+    console.error('Error deleting subject:', err);
+  }
+}
+
 async function logAuctionEvent(eventData) {
   if (!db) return;
   try {
@@ -86,5 +126,8 @@ module.exports = {
   saveGameState,
   loadGameState,
   loadAllRooms,
-  logAuctionEvent
+  logAuctionEvent,
+  saveSubject,
+  loadSubjects,
+  deleteSubject,
 };

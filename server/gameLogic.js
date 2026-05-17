@@ -1,51 +1,9 @@
-const { saveGameState, loadAllRooms } = require('./firebase');
+const { saveGameState, loadAllRooms, saveSubject, loadSubjects, deleteSubject } = require('./firebase');
+const familyCultureData = require('./data/family_culture.json');
 
 const defaultGameConfig = { initialBudget: 1000, bidUnit: 50 };
 
-const defaultCategoryConfig = [
-  {
-    id: 'condition',
-    name: '가족의 조건',
-    items: [
-      "모두의 생활 시간이 제각각인 가족",
-      "집에 있는 시간보다 밖에 있는 시간이 많은 가족",
-      "가족 구성원마다 성격 차이가 큰 가족",
-      "각자 좋아하는 것이 뚜렷한 가족",
-      "함께 보내는 시간도, 혼자 보내는 시간도 모두 중요한 가족",
-      "말보다 행동으로 표현하는 사람이 많은 가족",
-      "새로운 것을 함께 해보는 걸 좋아하는 가족",
-      "조용한 사람도 있고 활발한 사람도 있는 가족"
-    ]
-  },
-  {
-    id: 'atmosphere',
-    name: '가족의 분위기 코드',
-    items: [
-      "대화가 자주 오가는 분위기",
-      "다정한 말이 자연스러운 분위기",
-      "유머코드가 잘 통하는 분위기",
-      "편하게 쉬어갈 수 있는 분위기",
-      "서로를 믿고 맡길 수 있는 분위기",
-      "약속을 중요하게 여기는 분위기",
-      "작은 것도 함께 즐기는 분위기",
-      "각자의 개성을 살려주는 분위기"
-    ]
-  },
-  {
-    id: 'scene',
-    name: '필수 장면',
-    items: [
-      "하루 중 한 번은 서로의 하루를 나누는 시간",
-      "같이 웃는 순간이 자주 생기는 가족",
-      "힘든 사람이 있으면 자연스럽게 눈치채는 가족",
-      "중요한 일은 함께 이야기해서 정하는 가족",
-      "작은 일도 고맙다고 말하는 가족",
-      "각자의 취향을 보여주고 구경해주는 가족",
-      "함께하는 날을 따로 만들어 챙기는 가족",
-      "서운한 일이 생기면 그냥 넘기지 않고 풀어보는 가족"
-    ]
-  }
-];
+const defaultCategoryConfig = familyCultureData.categories;
 
 function buildItemsFromConfig(categoryConfig) {
   const itemList = [];
@@ -345,6 +303,38 @@ function setupSocketHandlers(io) {
       if (!state || socket.id !== state.teacherSocketId) return null;
       return { roomId, state };
     };
+
+    // 저장된 교과 목록 조회 (기본 내장 + Firestore 저장본)
+    async function getSubjectsList() {
+      const builtin = {
+        id: familyCultureData.id,
+        builtin: true,
+        name: familyCultureData.name,
+        categories: familyCultureData.categories,
+        gameConfig: familyCultureData.gameConfig,
+      };
+      const saved = await loadSubjects();
+      return [builtin, ...saved];
+    }
+
+    socket.on('loadSubjects', async () => {
+      if (!getTeacherRoom()) return;
+      socket.emit('subjects', await getSubjectsList());
+    });
+
+    socket.on('saveSubject', async ({ name, categories, gameConfig }) => {
+      if (!getTeacherRoom()) return;
+      if (!name?.trim() || !Array.isArray(categories) || categories.length === 0) return;
+      await saveSubject({ name: name.trim(), categories, gameConfig });
+      socket.emit('subjects', await getSubjectsList());
+    });
+
+    socket.on('deleteSubject', async ({ subjectId }) => {
+      if (!getTeacherRoom()) return;
+      if (subjectId === familyCultureData.id) return; // 기본 내장은 삭제 불가
+      await deleteSubject(subjectId);
+      socket.emit('subjects', await getSubjectsList());
+    });
 
     socket.on('startAuctionFor', (itemId) => {
       if (isThrottled('startAuctionFor', 1000)) return;

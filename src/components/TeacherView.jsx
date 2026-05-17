@@ -35,6 +35,9 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
   const [isProjectorMode, setIsProjectorMode]   = useState(true);
   const [showMenu, setShowMenu]                 = useState(false);
   const [codeCopied, setCodeCopied]             = useState(false);
+  const [savedSubjects, setSavedSubjects]       = useState([]);
+  const [subjectsLoading, setSubjectsLoading]   = useState(false);
+  const [subjectSaveName, setSubjectSaveName]   = useState('');
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -42,6 +45,12 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
+
+  useEffect(() => {
+    const handler = (subjects) => { setSavedSubjects(subjects); setSubjectsLoading(false); };
+    socket.on('subjects', handler);
+    return () => socket.off('subjects', handler);
+  }, [socket]);
 
   const categoryConfig = gameState.categoryConfig || [];
 
@@ -79,6 +88,30 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
     setEditingConfig(JSON.parse(JSON.stringify(categoryConfig)));
     setEditingGameConfig({ ...(gameState.gameConfig || { initialBudget: 1000, bidUnit: 50 }) });
     setShowCategoryConfig(true);
+    setSubjectsLoading(true);
+    socket.emit('loadSubjects');
+  };
+
+  const handleLoadSubject = (subject) => {
+    setEditingConfig(JSON.parse(JSON.stringify(subject.categories)));
+    setEditingGameConfig({ ...(subject.gameConfig || { initialBudget: 1000, bidUnit: 50 }) });
+  };
+
+  const handleSaveSubject = () => {
+    if (!subjectSaveName.trim()) { alert('저장할 이름을 입력하세요.'); return; }
+    const sanitized = editingConfig
+      .map(c => ({ ...c, name: c.name.trim(), items: c.items.map(i => i.trim()).filter(Boolean) }))
+      .filter(c => c.name && c.items.length > 0);
+    if (sanitized.length === 0) { alert('저장할 카테고리가 없습니다.'); return; }
+    socket.emit('saveSubject', { name: subjectSaveName.trim(), categories: sanitized, gameConfig: editingGameConfig });
+    setSubjectSaveName('');
+    setSubjectsLoading(true);
+  };
+
+  const handleDeleteSubject = (id, name) => {
+    if (!confirm(`'${name}' 수업을 삭제할까요?`)) return;
+    socket.emit('deleteSubject', { subjectId: id });
+    setSubjectsLoading(true);
   };
 
   const handleApplyCategoryConfig = () => {
@@ -608,7 +641,49 @@ export default function TeacherView({ gameState, socket, teamBidStatus, connecte
               <X size={20} />
             </button>
             <h2 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.25rem' }}>경매 설정</h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--orange)', marginBottom: '1.5rem' }}>⚠️ 적용 시 현재 경매가 초기화됩니다.</p>
+            <p style={{ fontSize: '0.85rem', color: 'var(--orange)', marginBottom: '1.25rem' }}>⚠️ 적용 시 현재 경매가 초기화됩니다.</p>
+
+            {/* 수업 라이브러리 */}
+            <div style={{ marginBottom: '1.5rem', padding: '1rem 1.25rem', background: 'rgba(124,106,255,0.05)', border: '1px solid rgba(124,106,255,0.2)', borderRadius: 'var(--radius-lg)' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--violet)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.75rem' }}>수업 라이브러리</div>
+
+              {subjectsLoading ? (
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-3)', marginBottom: '0.75rem' }}>불러오는 중...</div>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                  {savedSubjects.map(s => (
+                    <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.5rem 0.3rem 0.75rem', background: s.builtin ? 'rgba(124,106,255,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${s.builtin ? 'rgba(124,106,255,0.4)' : 'var(--border-default)'}`, borderRadius: 'var(--radius-full)' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: s.builtin ? 700 : 400, color: s.builtin ? 'var(--violet)' : 'var(--text-1)' }}>{s.name}</span>
+                      {s.builtin && <span style={{ fontSize: '0.68rem', color: 'var(--violet)', opacity: 0.65, marginRight: '0.1rem' }}>기본</span>}
+                      <button
+                        onClick={() => handleLoadSubject(s)}
+                        style={{ padding: '0.15rem 0.45rem', background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.35)', borderRadius: 'var(--radius-sm)', color: 'var(--emerald)', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700, fontFamily: 'Inter,sans-serif' }}
+                      >불러오기</button>
+                      {!s.builtin && (
+                        <button
+                          onClick={() => handleDeleteSubject(s.id, s.name)}
+                          style={{ padding: '0.15rem', background: 'transparent', border: 'none', color: 'var(--text-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', lineHeight: 1 }}
+                        ><X size={12} /></button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.75rem' }}>
+                <input
+                  value={subjectSaveName}
+                  onChange={e => setSubjectSaveName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSaveSubject()}
+                  placeholder="현재 설정을 이름 붙여 저장..."
+                  style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-sm)', color: 'var(--text-1)', padding: '0.4rem 0.75rem', fontFamily: 'Inter,sans-serif', fontSize: '0.875rem', outline: 'none' }}
+                />
+                <button
+                  onClick={handleSaveSubject}
+                  style={{ padding: '0.4rem 0.9rem', background: 'var(--violet-dim)', border: '1px solid rgba(124,106,255,0.4)', borderRadius: 'var(--radius-sm)', color: 'var(--violet)', cursor: 'pointer', fontFamily: 'Inter,sans-serif', fontSize: '0.82rem', fontWeight: 700, whiteSpace: 'nowrap' }}
+                >저장</button>
+              </div>
+            </div>
 
             {/* Game Rules */}
             {editingGameConfig && (
