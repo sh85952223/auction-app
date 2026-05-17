@@ -6,12 +6,6 @@ const cors = require('cors');
 const path = require('path');
 const { setupSocketHandlers } = require('./gameLogic');
 
-// 필수 환경변수 검증
-if (!process.env.TEACHER_PIN) {
-  console.error('FATAL: TEACHER_PIN 환경변수가 설정되지 않았습니다.');
-  console.error('  .env 파일에 TEACHER_PIN=<비밀번호> 를 추가하세요.');
-  process.exit(1);
-}
 
 const app = express();
 app.use(cors());

@@ -22,10 +22,9 @@ function App() {
     socket.emit('getTeamsForClass', { sessionCode: code });
   };
 
-  const handleJoin = (selectedRole, selectedTeamId = null, extraInfo = null, pin = null, code = null) => {
+  const handleJoin = (selectedRole, selectedTeamId = null, extraInfo = null, code = null) => {
     if (selectedRole === 'teacher') {
       localStorage.setItem('auctionRole', 'teacher');
-      if (pin) localStorage.setItem('auctionPin', pin);
       if (extraInfo) localStorage.setItem('auctionClassInfo', JSON.stringify(extraInfo));
       // sessionCode는 서버가 발급 → sessionCode 이벤트로 저장
     } else if (selectedRole === 'team') {
@@ -45,7 +44,6 @@ function App() {
       teamId: selectedTeamId,
       classInfo: selectedRole === 'teacher' ? extraInfo : null,
       studentInfo: selectedRole === 'team' ? extraInfo : null,
-      pin,
       sessionCode: code,
     });
   };
@@ -54,7 +52,6 @@ function App() {
     localStorage.removeItem('auctionRole');
     localStorage.removeItem('auctionTeamId');
     localStorage.removeItem('auctionStudentInfo');
-    localStorage.removeItem('auctionPin');
     localStorage.removeItem('auctionClassInfo');
     localStorage.removeItem('auctionSessionCode');
     setRole(null);
@@ -68,19 +65,18 @@ function App() {
     const restoreSession = () => {
       const savedRole = localStorage.getItem('auctionRole');
       if (savedRole === 'teacher') {
-        const savedPin = localStorage.getItem('auctionPin');
         const savedClassInfo = localStorage.getItem('auctionClassInfo');
         const savedCode = localStorage.getItem('auctionSessionCode');
         let classInfo = null;
         try { if (savedClassInfo) classInfo = JSON.parse(savedClassInfo); } catch { /* invalid JSON, skip */ }
-        if (savedPin) handleJoin('teacher', null, classInfo, savedPin, savedCode);
+        handleJoin('teacher', null, classInfo, savedCode);
       } else if (savedRole === 'team') {
         const savedTeamId = localStorage.getItem('auctionTeamId');
         const savedStudentInfo = localStorage.getItem('auctionStudentInfo');
         const savedCode = localStorage.getItem('auctionSessionCode');
         if (savedTeamId && savedStudentInfo && savedCode) {
           try {
-            handleJoin('team', savedTeamId, JSON.parse(savedStudentInfo), null, savedCode);
+            handleJoin('team', savedTeamId, JSON.parse(savedStudentInfo), savedCode);
           } catch (e) {
             console.error('Failed to parse student info', e);
           }

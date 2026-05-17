@@ -146,7 +146,6 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTea
   const [step, setStep] = useState(showTeacherMode ? 'ROLE' : 'SESSION_CODE');
   const [selectedTeam, setSelectedTeam] = useState(null);
 
-  const [teacherPin, setTeacherPin] = useState('');
   const [teacherGrade, setTeacherGrade] = useState('');
   const [teacherClassNum, setTeacherClassNum] = useState('');
 
@@ -158,8 +157,7 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTea
 
   const handleTeacherJoin = () => {
     if (!teacherGrade || !teacherClassNum) { alert('학년과 반을 모두 입력하세요.'); return; }
-    if (!teacherPin) { alert('비밀번호를 입력하세요.'); return; }
-    onJoin('teacher', null, { grade: teacherGrade, classNum: teacherClassNum }, teacherPin);
+    onJoin('teacher', null, { grade: teacherGrade, classNum: teacherClassNum });
   };
 
   const handleSessionCodeSubmit = () => {
@@ -252,15 +250,9 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTea
                   <input className="input-field" type="number" placeholder="학년" value={teacherGrade}
                     onChange={e => setTeacherGrade(e.target.value)} min="1" max="9" autoFocus style={{ textAlign: 'center' }} />
                   <input className="input-field" type="number" placeholder="반" value={teacherClassNum}
-                    onChange={e => setTeacherClassNum(e.target.value)} min="1" max="20" style={{ textAlign: 'center' }} />
+                    onChange={e => setTeacherClassNum(e.target.value)} min="1" max="20" style={{ textAlign: 'center' }}
+                    onKeyDown={e => e.key === 'Enter' && handleTeacherJoin()} />
                 </div>
-              </div>
-
-              <div style={S.fieldGroup}>
-                <span style={S.label}>비밀번호</span>
-                <input className="input-field" type="password" placeholder="교사 PIN 입력" value={teacherPin}
-                  onChange={e => setTeacherPin(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleTeacherJoin()} />
               </div>
 
               <button

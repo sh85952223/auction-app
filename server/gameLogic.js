@@ -174,9 +174,6 @@ function setupSocketHandlers(io) {
     }
   })();
 
-  // PIN 틀린 횟수 추적 (socketId → { count, lockedUntil })
-  const pinAttempts = new Map();
-
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
@@ -195,29 +192,8 @@ function setupSocketHandlers(io) {
       socket.emit('teamsForClass', state ? state.teams : []);
     });
 
-    socket.on('joinAs', ({ role, teamId, studentInfo, classInfo, pin, sessionCode }) => {
+    socket.on('joinAs', ({ role, teamId, studentInfo, classInfo, sessionCode }) => {
       if (role === 'teacher') {
-        const prev = pinAttempts.get(socket.id) || { count: 0, lockedUntil: 0 };
-        if (Date.now() < prev.lockedUntil) {
-          const sec = Math.ceil((prev.lockedUntil - Date.now()) / 1000);
-          socket.emit('authError', `비밀번호를 너무 많이 틀렸습니다. ${sec}초 후 다시 시도하세요.`);
-          return;
-        }
-        if (pin !== process.env.TEACHER_PIN) {
-          const count = prev.count + 1;
-          pinAttempts.set(socket.id, count >= 3
-            ? { count: 0, lockedUntil: Date.now() + 30_000 }
-            : { count, lockedUntil: 0 }
-          );
-          const remaining = 3 - count;
-          socket.emit('authError', remaining > 0
-            ? `비밀번호가 올바르지 않습니다. (${remaining}회 남음)`
-            : '비밀번호를 너무 많이 틀렸습니다. 30초 후 다시 시도하세요.'
-          );
-          return;
-        }
-        pinAttempts.delete(socket.id);
-
         // 재접속: 기존 세션 코드로 룸 복원
         let roomId = sessionCode && rooms.has(sessionCode) ? sessionCode : null;
         // 신규: 새 세션 코드 생성
@@ -306,7 +282,6 @@ function setupSocketHandlers(io) {
       const state = rooms.get(roomId);
       if (!state) { console.log('Client disconnected:', socket.id); return; }
 
-      pinAttempts.delete(socket.id);
       if (socket.id === state.teacherSocketId) state.teacherSocketId = null;
       if (state.connectedTeams[socket.id]) {
         delete state.connectedTeams[socket.id];
