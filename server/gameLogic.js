@@ -126,13 +126,14 @@ function calculateMaxBid(state, teamId, currentItemCategory) {
 }
 
 function sanitizeState(state, forTeacher = false) {
-  const { initialBids, ...safeState } = state;
+  const { initialBids, teacherSocketId, connectedTeams, ...safeState } = state;
   const revealPhases = ['REVEALING', 'TIE_BREAKER', 'SOLD', 'NO_BIDS'];
   const showBids = forTeacher || revealPhases.includes(state.auctionPhase);
   return {
     ...safeState,
     bids: showBids ? safeState.bids : {},
-    secretTicketRequests: forTeacher ? safeState.secretTicketRequests : {},
+    secretTicketRequests: forTeacher ? state.secretTicketRequests : {},
+    ...(forTeacher ? { teacherSocketId, connectedTeams } : {}),
   };
 }
 

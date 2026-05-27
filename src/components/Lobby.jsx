@@ -72,7 +72,7 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTea
 
   const handleTeacherJoin = () => {
     if (!teacherGrade || !teacherClassNum) { alert('학년과 반을 모두 입력하세요.'); return; }
-    onJoin('teacher', null, { grade: teacherGrade, classNum: teacherClassNum });
+    onJoin({ role: 'teacher', classInfo: { grade: teacherGrade, classNum: teacherClassNum } });
   };
 
   const handleSessionCodeSubmit = () => {
@@ -90,7 +90,7 @@ export default function Lobby({ onJoin, onRequestTeams, connectedTeams, lobbyTea
   const handleTeamJoin = () => {
     const validMembers = members.map(m => m.trim()).filter(Boolean).join(', ');
     if (!grade || !classNum || !validMembers) { alert('학년, 반, 모둠원 이름을 입력해주세요.'); return; }
-    onJoin('team', selectedTeam.id, { grade, classNum, members: validMembers }, null, sessionCode.trim().toUpperCase());
+    onJoin({ role: 'team', teamId: selectedTeam.id, studentInfo: { grade, classNum, members: validMembers }, sessionCode: sessionCode.trim().toUpperCase() });
   };
 
   const BackBtn = ({ onClick, label = '뒤로' }) => (

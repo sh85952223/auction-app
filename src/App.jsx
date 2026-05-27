@@ -22,15 +22,15 @@ function App() {
     socket.emit('getTeamsForClass', { sessionCode: code });
   };
 
-  const handleJoin = (selectedRole, selectedTeamId = null, extraInfo = null, code = null) => {
+  const handleJoin = ({ role: selectedRole, teamId: selectedTeamId = null, classInfo = null, studentInfo = null, sessionCode: code = null }) => {
     if (selectedRole === 'teacher') {
       localStorage.setItem('auctionRole', 'teacher');
-      if (extraInfo) localStorage.setItem('auctionClassInfo', JSON.stringify(extraInfo));
+      if (classInfo) localStorage.setItem('auctionClassInfo', JSON.stringify(classInfo));
       // sessionCode는 서버가 발급 → sessionCode 이벤트로 저장
     } else if (selectedRole === 'team') {
       localStorage.setItem('auctionRole', 'team');
       localStorage.setItem('auctionTeamId', selectedTeamId);
-      if (extraInfo) localStorage.setItem('auctionStudentInfo', JSON.stringify(extraInfo));
+      if (studentInfo) localStorage.setItem('auctionStudentInfo', JSON.stringify(studentInfo));
       if (code) localStorage.setItem('auctionSessionCode', code);
     }
 
@@ -42,8 +42,8 @@ function App() {
     socket.emit('joinAs', {
       role: selectedRole,
       teamId: selectedTeamId,
-      classInfo: selectedRole === 'teacher' ? extraInfo : null,
-      studentInfo: selectedRole === 'team' ? extraInfo : null,
+      classInfo,
+      studentInfo,
       sessionCode: code,
     });
   };
@@ -69,14 +69,14 @@ function App() {
         const savedCode = localStorage.getItem('auctionSessionCode');
         let classInfo = null;
         try { if (savedClassInfo) classInfo = JSON.parse(savedClassInfo); } catch { /* invalid JSON, skip */ }
-        handleJoin('teacher', null, classInfo, savedCode);
+        handleJoin({ role: 'teacher', classInfo, sessionCode: savedCode });
       } else if (savedRole === 'team') {
         const savedTeamId = localStorage.getItem('auctionTeamId');
         const savedStudentInfo = localStorage.getItem('auctionStudentInfo');
         const savedCode = localStorage.getItem('auctionSessionCode');
         if (savedTeamId && savedStudentInfo && savedCode) {
           try {
-            handleJoin('team', savedTeamId, JSON.parse(savedStudentInfo), savedCode);
+            handleJoin({ role: 'team', teamId: savedTeamId, studentInfo: JSON.parse(savedStudentInfo), sessionCode: savedCode });
           } catch (e) {
             console.error('Failed to parse student info', e);
           }
